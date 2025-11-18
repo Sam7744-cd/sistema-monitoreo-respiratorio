@@ -6,10 +6,10 @@ const MedicionTiempoRealSchema = new mongoose.Schema(
     movY: Number,
     movZ: Number,
     ruido: Number,
-    diagnostico: String, // "Normal", "Asma", etc.
+    diagnostico: String,
     alerta: Boolean
   },
-  { timestamps: true } // createdAt servirá para el tiempo real
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("MedicionTiempoReal", MedicionTiempoRealSchema);
