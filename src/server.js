@@ -43,8 +43,8 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
-// Levanto el servidor en el puerto definido en .env o por defecto en 3680
 const PORT = process.env.PORT || 3680;
-app.listen(PORT, () => {
-  console.log(` Servidor en puerto ${PORT}`);
+// Levanto el servidor en el puerto definido en .env o por defecto en 3680
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor escuchando externamente en el puerto ${PORT}`);
 });
