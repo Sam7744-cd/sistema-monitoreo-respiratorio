@@ -1,4 +1,4 @@
-const MedicionTiempoReal = require("../models/medicionTiempoReal");
+const MedicionTiempoReal = require("../models/zz_MedicionTiempoReal");
 
 // Recibir medición del ESP32
 exports.recibirMedicion = async (req, res) => {
