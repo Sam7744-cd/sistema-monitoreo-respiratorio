@@ -9,6 +9,7 @@ const {
 
 const authMiddleware = require('../middleware/auth');
 const roleMiddleware = require('../middleware/roles');
+const Paciente = require("../models/Paciente");
 
 const router = express.Router();
 
@@ -30,5 +31,29 @@ router.post('/:pacienteId/familiares', roleMiddleware(['medico', 'admin']), agre
 // Obtener resumen clínico de un paciente
 router.get('/:id/resumen', roleMiddleware(['medico', 'familiar', 'admin']), obtenerResumenPaciente);
 
+// ASIGNAR MÉDICO A PACIENTE (TEMPORAL)
+router.put("/asignar-medico/:id", roleMiddleware(['admin', 'medico']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { medicoId } = req.body;
+
+    const paciente = await Paciente.findByIdAndUpdate(
+      id,
+      { medico: medicoId },
+      { new: true }
+    );
+
+    if (!paciente) {
+      return res.status(404).json({ error: "Paciente no encontrado" });
+    }
+
+    res.json({
+      mensaje: "Médico asignado correctamente",
+      paciente
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Error asignando médico" });
+  }
+});
 
 module.exports = router;
