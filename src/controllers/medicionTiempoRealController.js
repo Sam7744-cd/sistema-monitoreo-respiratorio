@@ -1,41 +1,40 @@
 const MedicionTiempoReal = require("../models/medicionTiempoReal");
+const { getPacienteActual } = require("./tiempoRealSeleccionController");
 
-// ============================================================
-//  Cálculo del diagnóstico en BACKEND
-// ============================================================
+// ============================================
+// Calcular diagnóstico según ruido
+// ============================================
 function calcularDiagnostico(ruido) {
-  if (ruido < 56) return "Normal";
-  if (ruido < 71) return "Asma";
-  if (ruido < 83) return "Bronquitis";
-  return "Neumonía";
+  if (ruido < -65) return "Normal";
+  if (ruido < -50) return "Asma";
+  return "Bronquitis";
 }
 
-function calcularAlerta(ruido) {
-  return ruido >= 83; // true si neumonía
-}
-
-// ============================================================
-//  Recibir medición del ESP32 (POST)
-// ============================================================
+// ============================================
+// Recibir medición del ESP32
+// ============================================
 exports.recibirMedicion = async (req, res) => {
   try {
-    const { paciente, movX, movY, movZ, ruido } = req.body;
+    const pacienteSeleccionado = getPacienteActual();
 
-    if (!paciente) {
-      return res.status(400).json({ msg: "Falta el ID del paciente" });
+    if (!pacienteSeleccionado) {
+      return res.status(400).json({
+        msg: "No se ha seleccionado un paciente desde la app",
+      });
     }
 
+    const { movX, movY, movZ, ruido } = req.body;
+
     const diagnostico = calcularDiagnostico(ruido);
-    const alerta = calcularAlerta(ruido);
 
     const medicion = await MedicionTiempoReal.create({
-      paciente,
+      paciente: pacienteSeleccionado,
       movX,
       movY,
       movZ,
       ruido,
       diagnostico,
-      alerta
+      alerta: diagnostico === "Bronquitis",
     });
 
     res.json(medicion);
@@ -45,9 +44,9 @@ exports.recibirMedicion = async (req, res) => {
   }
 };
 
-// ============================================================
-//  Última medición (GET) para la app
-// ============================================================
+// ============================================
+// Obtener última medición (para app)
+// ============================================
 exports.obtenerActual = async (req, res) => {
   try {
     const ultima = await MedicionTiempoReal.findOne()
@@ -64,7 +63,7 @@ exports.obtenerActual = async (req, res) => {
       ruido: ultima.ruido,
       diagnostico: ultima.diagnostico,
       alerta: ultima.alerta,
-      timestamp: ultima.createdAt
+      timestamp: ultima.createdAt,
     });
   } catch (error) {
     console.error(error);
