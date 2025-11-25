@@ -1,14 +1,15 @@
 // -------------------------------------------------------------
-// pacienteController.js - Versión final estable
+// pacienteController.js - Versión final estable + registrarConFamiliar
 // -------------------------------------------------------------
 const Paciente = require('../models/Paciente');
 const Usuario = require('../models/Usuario');
 const Medicion = require('../models/medicion');
 const Alerta = require('../models/Alerta');
 const Reporte = require('../models/Reporte');
+const bcrypt = require("bcryptjs");
 
 // -------------------------------------------------------------
-// Crear paciente
+// Crear paciente (versión antigua)
 // -------------------------------------------------------------
 const crearPaciente = async (req, res) => {
   try {
@@ -36,7 +37,90 @@ const crearPaciente = async (req, res) => {
 };
 
 // -------------------------------------------------------------
-// Obtener pacientes SOLO del médico actual
+// NUEVO CONTROLADOR: Registrar PACIENTE + FAMILIAR
+// -------------------------------------------------------------
+const registrarConFamiliar = async (req, res) => {
+  try {
+    const medicoId = req.usuario.id;
+
+    const { paciente, familiar } = req.body;
+
+    if (!paciente || !familiar) {
+      return res.status(400).json({ error: "Datos incompletos" });
+    }
+
+    // ---------------------------------------------------------
+    // 1. BUSCAR o CREAR FAMILIAR
+    // ---------------------------------------------------------
+    let familiarUsuario = await Usuario.findOne({
+      $or: [
+        { email: familiar.correo },
+        { cedula: familiar.cedula }
+      ]
+    });
+
+    if (!familiarUsuario) {
+      // Crear familiar automáticamente
+      familiarUsuario = new Usuario({
+        nombre: familiar.nombre,
+        email: familiar.correo,
+        password: await bcrypt.hash(familiar.cedula + "123", 10),
+        rol: "familiar",
+        telefono: familiar.telefono,
+        cedula: familiar.cedula,
+        parentesco: familiar.parentesco,
+      });
+
+      await familiarUsuario.save();
+    }
+
+    // ---------------------------------------------------------
+    // 2. CREAR PACIENTE
+    // ---------------------------------------------------------
+    const nuevoPaciente = new Paciente({
+      ...paciente,
+      medico: medicoId,
+      familiares: [familiarUsuario._id]
+    });
+
+    await nuevoPaciente.save();
+
+    // ---------------------------------------------------------
+    // 3. ASOCIAR PACIENTE AL FAMILIAR
+    // ---------------------------------------------------------
+    if (!familiarUsuario.pacientes) familiarUsuario.pacientes = [];
+
+    if (!familiarUsuario.pacientes.includes(nuevoPaciente._id)) {
+      familiarUsuario.pacientes.push(nuevoPaciente._id);
+      await familiarUsuario.save();
+    }
+
+    // ---------------------------------------------------------
+    // 4. ASOCIAR PACIENTE AL MÉDICO
+    // ---------------------------------------------------------
+    await Usuario.findByIdAndUpdate(medicoId, {
+      $addToSet: { pacientes: nuevoPaciente._id }
+    });
+
+    // ---------------------------------------------------------
+    // 5. RESPUESTA
+    // ---------------------------------------------------------
+    res.status(201).json({
+      mensaje: "Paciente y familiar registrados correctamente",
+      paciente: nuevoPaciente,
+      familiar: familiarUsuario
+    });
+
+  } catch (error) {
+    console.error("ERROR registrarConFamiliar:", error);
+    res.status(500).json({
+      error: "Error en el servidor: " + error.message
+    });
+  }
+};
+
+// -------------------------------------------------------------
+// Obtener pacientes solo del médico
 // -------------------------------------------------------------
 const obtenerPacientes = async (req, res) => {
   try {
@@ -128,6 +212,7 @@ const obtenerResumenPaciente = async (req, res) => {
 
 module.exports = {
   crearPaciente,
+  registrarConFamiliar,
   obtenerPacientes,
   obtenerPaciente,
   agregarFamiliar,
