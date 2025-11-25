@@ -37,7 +37,18 @@ exports.recibirMedicion = async (req, res) => {
       alerta: diagnostico === "Bronquitis",
     });
 
-    res.json(medicion);
+    res.json({
+      msg: "Medición recibida",
+      paciente: medicion.paciente,
+      movX: medicion.movX,
+      movY: medicion.movY,
+      movZ: medicion.movZ,
+      ruido: medicion.ruido,
+      diagnostico: medicion.diagnostico,
+      alerta: medicion.alerta,
+      timestamp: medicion.createdAt,               // ← FECHA QUE GUARDA BD
+      fechaHora: medicion.createdAt.toISOString()  // ← FORMATO PARA LA APP
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: "Error al guardar la medición" });
@@ -53,7 +64,19 @@ exports.obtenerActual = async (req, res) => {
       .sort({ createdAt: -1 })
       .populate("paciente");
 
-    if (!ultima) return res.json({ msg: "No hay datos aún" });
+    if (!ultima) {
+      return res.json({
+        paciente: null,
+        movX: null,
+        movY: null,
+        movZ: null,
+        ruido: null,
+        diagnostico: "—",
+        alerta: false,
+        timestamp: new Date(),
+        fechaHora: new Date().toISOString(),  // ← LA APP YA PUEDE MOSTRARLO
+      });
+    }
 
     res.json({
       paciente: ultima.paciente._id,
@@ -64,6 +87,7 @@ exports.obtenerActual = async (req, res) => {
       diagnostico: ultima.diagnostico,
       alerta: ultima.alerta,
       timestamp: ultima.createdAt,
+      fechaHora: ultima.createdAt.toISOString(),  // ← FORMATO PARA TU APP
     });
   } catch (error) {
     console.error(error);
