@@ -27,6 +27,8 @@ app.use('/api/analysis', analysisRoutes); // Procesamiento y análisis de audio
 app.use('/api/alertas', require('./routes/alertaRoutes')); // Alwrtas medicas (se usan para guardar y consultar alertas generadas por las mediciones)
 app.use('/api/reportes', require('./routes/reporteRoutes')); //reportes medicos
 app.use('/api/dispositivos', require('./routes/dispositivoRoutes')); // registrar o consultar dispositivos
+app.use("/api/usuarios", require("./routes/usuarioRoutes")); //traer paciente 
+
 //Ruta tiempo real
 app.use('/api/tiempo-real', require('./routes/medicionTiempoRealRoutes'));
 
