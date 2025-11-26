@@ -118,6 +118,56 @@ const registrarConFamiliar = async (req, res) => {
     });
   }
 };
+// -------------------------------------------------------------
+// ASOCIAR FAMILIAR A PACIENTE POR CÉDULA
+// -------------------------------------------------------------
+const asociarPorCedula = async (req, res) => {
+  try {
+    const { cedulaPaciente, cedulaFamiliar } = req.body;
+
+    if (!cedulaPaciente || !cedulaFamiliar) {
+      return res.status(400).json({ error: "Faltan cédulas" });
+    }
+
+    // Buscar paciente
+    const paciente = await Paciente.findOne({ cedula: cedulaPaciente });
+
+    if (!paciente) {
+      return res.status(404).json({ error: "Paciente no encontrado" });
+    }
+
+    // Buscar familiar
+    const familiar = await Usuario.findOne({
+      cedula: cedulaFamiliar,
+      rol: "familiar",
+    });
+
+    if (!familiar) {
+      return res.status(404).json({ error: "Familiar no encontrado" });
+    }
+
+    // Evitar duplicados
+    if (!paciente.familiares.includes(familiar._id)) {
+      paciente.familiares.push(familiar._id);
+      await paciente.save();
+    }
+
+    if (!familiar.pacientes.includes(paciente._id)) {
+      familiar.pacientes.push(paciente._id);
+      await familiar.save();
+    }
+
+    res.json({
+      mensaje: "Asociación realizada con éxito",
+      paciente,
+      familiar,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error en servidor" });
+  }
+};
 
 // -------------------------------------------------------------
 // Obtener pacientes solo del médico
@@ -213,6 +263,7 @@ const obtenerResumenPaciente = async (req, res) => {
 module.exports = {
   crearPaciente,
   registrarConFamiliar,
+  asociarPorCedula,
   obtenerPacientes,
   obtenerPaciente,
   agregarFamiliar,

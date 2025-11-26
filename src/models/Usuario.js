@@ -1,46 +1,55 @@
 const mongoose = require('mongoose');
 
-// Esquema para los usuarios del sistema: médicos, familiares o administradores
+// Esquema para usuarios del sistema (médicos, familiares, admins)
 const usuarioSchema = new mongoose.Schema({
   nombre: {
     type: String,
-    required: [true, 'El nombre es obligatorio'], // Validación obligatoria
-    trim: true // Elimina espacios innecesarios
+    required: true,
+    trim: true,
   },
+
   email: {
     type: String,
-    required: [true, 'El email es obligatorio'],
-    unique: true, // No se pueden repetir correos
-    lowercase: true, // Convierte todo a minúsculas
-    trim: true
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
   },
+
   password: {
     type: String,
-    required: [true, 'La contraseña es obligatoria'],
-    minlength: 6 // Longitud mínima
+    required: true,
+    minlength: 6,
   },
+
   rol: {
     type: String,
-    enum: ['medico', 'familiar', 'admin'], // Tipos de usuario permitidos
-    required: true,
-    default: 'familiar'
+    enum: ["medico", "familiar", "admin"],
+    default: "familiar",
   },
+
+  cedula: {
+    type: String,
+    trim: true,
+    unique: false,
+  },
+
   telefono: {
     type: String,
-    trim: true
+    trim: true,
   },
-  especialidad: {
+
+  parentesco: {
     type: String,
-    trim: true
+    trim: true,
   },
-  pacientes: [{
-    // Un médico o familiar puede tener múltiples pacientes asociados
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Paciente'
-  }]
-}, {
-  timestamps: true // Añade automáticamente createdAt y updatedAt
+
+  pacientes: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Paciente",
+    },
+  ],
 });
 
-// Exportamos el modelo
-module.exports = mongoose.model('Usuario', usuarioSchema);
+module.exports = mongoose.model("Usuario", usuarioSchema);

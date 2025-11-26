@@ -82,4 +82,14 @@ router.put(
   }
 );
 
+// -------------------------------------------------------------
+// ASOCIAR FAMILIAR A PACIENTE POR CÉDULA
+// -------------------------------------------------------------
+router.post(
+  "/asociar-cedula",
+  roleMiddleware(["medico", "admin"]),
+  asociarPorCedula
+);
+
+
 module.exports = router;
