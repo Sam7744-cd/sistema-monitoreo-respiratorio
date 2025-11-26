@@ -49,9 +49,6 @@ const registrarConFamiliar = async (req, res) => {
       return res.status(400).json({ error: "Datos incompletos" });
     }
 
-    // ---------------------------------------------------------
-    // 1. BUSCAR o CREAR FAMILIAR
-    // ---------------------------------------------------------
     let familiarUsuario = await Usuario.findOne({
       $or: [
         { email: familiar.correo },
@@ -60,7 +57,6 @@ const registrarConFamiliar = async (req, res) => {
     });
 
     if (!familiarUsuario) {
-      // Crear familiar automáticamente
       familiarUsuario = new Usuario({
         nombre: familiar.nombre,
         email: familiar.correo,
@@ -74,9 +70,6 @@ const registrarConFamiliar = async (req, res) => {
       await familiarUsuario.save();
     }
 
-    // ---------------------------------------------------------
-    // 2. CREAR PACIENTE
-    // ---------------------------------------------------------
     const nuevoPaciente = new Paciente({
       ...paciente,
       medico: medicoId,
@@ -85,9 +78,6 @@ const registrarConFamiliar = async (req, res) => {
 
     await nuevoPaciente.save();
 
-    // ---------------------------------------------------------
-    // 3. ASOCIAR PACIENTE AL FAMILIAR
-    // ---------------------------------------------------------
     if (!familiarUsuario.pacientes) familiarUsuario.pacientes = [];
 
     if (!familiarUsuario.pacientes.includes(nuevoPaciente._id)) {
@@ -95,16 +85,10 @@ const registrarConFamiliar = async (req, res) => {
       await familiarUsuario.save();
     }
 
-    // ---------------------------------------------------------
-    // 4. ASOCIAR PACIENTE AL MÉDICO
-    // ---------------------------------------------------------
     await Usuario.findByIdAndUpdate(medicoId, {
       $addToSet: { pacientes: nuevoPaciente._id }
     });
 
-    // ---------------------------------------------------------
-    // 5. RESPUESTA
-    // ---------------------------------------------------------
     res.status(201).json({
       mensaje: "Paciente y familiar registrados correctamente",
       paciente: nuevoPaciente,
@@ -118,6 +102,7 @@ const registrarConFamiliar = async (req, res) => {
     });
   }
 };
+
 // -------------------------------------------------------------
 // ASOCIAR FAMILIAR A PACIENTE POR CÉDULA
 // -------------------------------------------------------------
@@ -129,14 +114,12 @@ const asociarPorCedula = async (req, res) => {
       return res.status(400).json({ error: "Faltan cédulas" });
     }
 
-    // Buscar paciente
     const paciente = await Paciente.findOne({ cedula: cedulaPaciente });
 
     if (!paciente) {
       return res.status(404).json({ error: "Paciente no encontrado" });
     }
 
-    // Buscar familiar
     const familiar = await Usuario.findOne({
       cedula: cedulaFamiliar,
       rol: "familiar",
@@ -146,7 +129,6 @@ const asociarPorCedula = async (req, res) => {
       return res.status(404).json({ error: "Familiar no encontrado" });
     }
 
-    // Evitar duplicados
     if (!paciente.familiares.includes(familiar._id)) {
       paciente.familiares.push(familiar._id);
       await paciente.save();
@@ -170,16 +152,28 @@ const asociarPorCedula = async (req, res) => {
 };
 
 // -------------------------------------------------------------
-// Obtener pacientes solo del médico
+// ⚠️ ESTA ES LA FUNCIÓN QUE ESTABA MAL — YA ESTÁ CORREGIDA
 // -------------------------------------------------------------
 const obtenerPacientes = async (req, res) => {
   try {
-    const medicoId = req.usuario.id;
+    const usuarioId = req.usuario.id;
+    const rol = req.usuario.rol;
 
-    const pacientes = await Paciente.find({ medico: medicoId });
+    let pacientes = [];
+
+    // Médico → sus pacientes
+    if (rol === "medico") {
+      pacientes = await Paciente.find({ medico: usuarioId });
+    }
+
+    // Familiar → los pacientes asociados a él
+    else if (rol === "familiar") {
+      pacientes = await Paciente.find({ familiares: usuarioId });
+    }
 
     res.json(pacientes);
   } catch (error) {
+    console.error("ERROR obtenerPacientes:", error);
     res.status(500).json({ error: "Error al obtener pacientes" });
   }
 };
