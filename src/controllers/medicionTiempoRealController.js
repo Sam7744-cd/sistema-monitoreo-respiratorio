@@ -2,11 +2,18 @@ const MedicionTiempoReal = require("../models/medicionTiempoReal");
 const { getPacienteActual } = require("./tiempoRealSeleccionController");
 const { analizarRespiracion } = require("../analysisR/detectorRespiratorio");
 
-// ------------------------------------------------------
-// Recibir medición desde ESP32
-// ------------------------------------------------------
+/* ----------------------------------------------------------------
+    RECIBIR MEDICIÓN DEL ESP32
+   Aquí el backend procesa los datos crudos enviados por el ESP32:
+   - Movimiento (MPU6050)
+   - Características de audio
+   - Señal FFT (opcional si envías el array)
+   Después usa el analizador (detectorRespiratorio.js) para generar
+   el diagnóstico real del backend.
+   ------------------------------------------------------------- */
 exports.recibirMedicion = async (req, res) => {
   try {
+    // 1) Verificar que la app seleccionó un paciente antes de medir
     const pacienteId = getPacienteActual();
 
     if (!pacienteId) {
@@ -15,9 +22,13 @@ exports.recibirMedicion = async (req, res) => {
       });
     }
 
+    // Datos crudos enviados por el ESP32
     const data = req.body;
 
-    // VALIDACIÓN mínima para evitar "undefined"
+
+       //Sanitizar valores para evitar "undefined"
+       //Esto evita que Mongo o el análisis fallen por faltantes.
+
     const safe = {
       movX: data.movX ?? 0,
       movY: data.movY ?? 0,
@@ -29,12 +40,22 @@ exports.recibirMedicion = async (req, res) => {
       spectral_centroid: data.spectral_centroid ?? 0,
       wheeze_ratio: data.wheeze_ratio ?? 0,
       roncus_ratio: data.roncus_ratio ?? 0,
+
+      // FFT (si la envías desde el ESP32)
+      audio_fft: data.audio_fft ?? [],
     };
 
-    // 1. Analizar características respiratorias
+
+       //2) Análisis respiratorio en el backend
+       //Esta función decide: Normal / Asma / Bronquitis
+       //usando reglas determinísticas + FFT (si existe).
+
     const diagnostico = analizarRespiracion(safe);
 
-    // 2. Guardar en la BD
+
+       // 3) Guardar en MongoDB
+       //Aquí se almacena TODO lo medido y el diagnóstico final.
+
     const medicion = await MedicionTiempoReal.create({
       paciente: pacienteId,
 
@@ -49,6 +70,8 @@ exports.recibirMedicion = async (req, res) => {
       wheeze_ratio: safe.wheeze_ratio,
       roncus_ratio: safe.roncus_ratio,
 
+      audio_fft: safe.audio_fft, // si se envía FFT
+
       diagnostico,
       alerta: diagnostico !== "Normal",
     });
@@ -61,9 +84,11 @@ exports.recibirMedicion = async (req, res) => {
   }
 };
 
-// ------------------------------------------------------
-// Obtener última medición
-// ------------------------------------------------------
+
+
+   //OBTENER ÚLTIMA MEDICIÓN (app móvil)
+   //La app consulta cada 2–3 segundos para ver los cambios.
+
 exports.obtenerActual = async (req, res) => {
   try {
     const ultima = await MedicionTiempoReal.findOne()
@@ -87,6 +112,8 @@ exports.obtenerActual = async (req, res) => {
       spectral_centroid: ultima.spectral_centroid,
       wheeze_ratio: ultima.wheeze_ratio,
       roncus_ratio: ultima.roncus_ratio,
+
+      audio_fft: ultima.audio_fft ?? [],
 
       diagnostico: ultima.diagnostico,
       alerta: ultima.alerta,
