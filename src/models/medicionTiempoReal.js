@@ -1,22 +1,42 @@
 const mongoose = require("mongoose");
 
-const MedicionTiempoRealSchema = new mongoose.Schema(
+const medicionTiempoRealSchema = new mongoose.Schema(
   {
     paciente: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Paciente",
-      required: true
+      required: true,
     },
 
-    movX: Number,
-    movY: Number,
-    movZ: Number,
-    ruido: Number,
+    // -------------------------
+    // MOVIMIENTO (MPU6050)
+    // -------------------------
+    movX: { type: Number, default: 0 },
+    movY: { type: Number, default: 0 },
+    movZ: { type: Number, default: 0 },
 
-    diagnostico: String,    // Lo calculara el backend
-    alerta: Boolean         // Tambien lo calcula  el backend
+    // -------------------------
+    // AUDIO / CARAC. RESPIRATORIAS
+    // -------------------------
+    ruido: { type: Number, default: 0 },               // dB
+    rms: { type: Number, default: 0 },                 // Root Mean Square (energía)
+    zcr: { type: Number, default: 0 },                 // Zero Crossing Rate
+    spectral_centroid: { type: Number, default: 0 },   // Centroide espectral
+    wheeze_ratio: { type: Number, default: 0 },        // Sibilancias
+    roncus_ratio: { type: Number, default: 0 },        // Roncus
+
+    // -------------------------
+    // RESULTADO DEL BACKEND
+    // -------------------------
+    diagnostico: {
+      type: String,
+      enum: ["Normal", "Asma", "Bronquitis"],
+      default: "Normal",
+    },
+
+    alerta: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("MedicionTiempoReal", MedicionTiempoRealSchema);
+module.exports = mongoose.model("MedicionTiempoReal", medicionTiempoRealSchema);

@@ -8,8 +8,7 @@ const Alerta = require('../models/Alerta');
 const Reporte = require('../models/Reporte');
 const bcrypt = require("bcryptjs");
 
-// -------------------------------------------------------------
-// Crear paciente (versión antigua)
+
 // -------------------------------------------------------------
 const crearPaciente = async (req, res) => {
   try {
@@ -151,8 +150,7 @@ const asociarPorCedula = async (req, res) => {
   }
 };
 
-// -------------------------------------------------------------
-// ⚠️ ESTA ES LA FUNCIÓN QUE ESTABA MAL — YA ESTÁ CORREGIDA
+
 // -------------------------------------------------------------
 const obtenerPacientes = async (req, res) => {
   try {
