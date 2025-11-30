@@ -1,8 +1,4 @@
-// detectorRespiratorio.js
-// Analizador respiratorio determinístico.
-// Utiliza características temporales y frecuenciales para
-// distinguir entre respiración Normal, Asma o Bronquitis.
-
+//  detectorRespiratorio.js
 const {
   rms,
   zcr,
@@ -13,39 +9,43 @@ const {
   roncusRatio,
 } = require("./features");
 
+
+//  FUNCIÓN PRINCIPAL – ANALIZAR RESPIRACIÓN
 function analizarRespiracion(data) {
 
-  // Si no viene audio, usar modo ligero
+  //  Si NO existe audio_raw - usar modo ligero basado en métricas
   if (!data.audio_raw) {
     return diagnosticoSinAudio(data);
   }
 
-  // --- MODO COMPLETO (cuando ESP32 envíe audio_raw) ---
+  //  MODO COMPLETO (cuando el ESP32 envíe audio crudo)
   const audio = data.audio_raw;
 
   if (!audio || audio.length < 128) return "Normal";
 
-  // 1. Normalizar señal de 32 bits a [-1, 1]
+  // 1. Normalizar señal 32-bit → [-1, 1]
   const norm = audio.map(x => x / 2147483648.0);
 
   // 2. Características temporales
   const r = rms(norm);
   const z = zcr(norm);
 
-  // 3. FFT y magnitud espectral
+  // 3. FFT
   const { real, imag } = fft_real(norm);
+
+  // 4. Magnitud espectral
   const mag = magnitud(real, imag);
 
-  // 4. Métricas frecuenciales
+  // 5. Características frecuenciales
   const centroid = spectralCentroid(mag);
-  const wheeze   = wheezeRatio(mag);
-  const roncus   = roncusRatio(mag);
+  const wheeze = wheezeRatio(mag);
+  const roncus = roncusRatio(mag);
 
+  // 6. Clasificación determinística
   return reglasDiagnostico({ rms: r, zcr: z, centroid, wheeze, roncus });
 }
 
-// MODO LIGERO – usando los datos enviados por ESP32
-
+//  MODO LIGERO - cuando ESP32 envía solo parámetros y NO audio_raw
 function diagnosticoSinAudio(d) {
   return reglasDiagnostico({
     rms: d.rms,
@@ -56,26 +56,26 @@ function diagnosticoSinAudio(d) {
   });
 }
 
-// Reglas determinísticas del diagnóstico
 function reglasDiagnostico({ rms, zcr, centroid, wheeze, roncus }) {
 
-  // ASMA → mucha energía en wheeze (frecuencia media-alta)
+  // ASMA - Wheeze dominante en frecuencias medias-altas
   if (wheeze > 0.45 && wheeze > roncus) {
     return "Asma";
   }
 
-  // BRONQUITIS → energía concentrada en bajas frecuencias
+  // BRONQUITIS - energía fuerte en bajas frecuencias (roncus)
   if (roncus > 0.45 && roncus > wheeze) {
     return "Bronquitis";
   }
 
-  // Umbral adicional basado en centroide (bronquitis grave)
+  // BRONQUITIS (criterio alterno) - centroide muy bajo
   if (centroid < 320) {
     return "Bronquitis";
   }
 
-  // Si no se detectan patrones → Normal
+  // Ningún patrón - respiración normal
   return "Normal";
 }
 
+//  Exportar
 module.exports = { analizarRespiracion };

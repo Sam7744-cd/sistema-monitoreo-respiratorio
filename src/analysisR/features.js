@@ -1,43 +1,58 @@
-// features.js - Cálculo de características de audio
-// Este módulo obtiene métricas acústicas usadas para
-// diagnosticar respiración: RMS, ZCR, Centroide Espectral,
-// Wheeze Ratio y Roncus Ratio.
-// También integra FFT para análisis frecuencial.
+//  features.js - Cálculo de características de audio
+//  Este módulo implementa todas las características necesarias para el análisis
+//  respiratorio determinístico. Aquí se calculan métricas temporales y
+//  frecuenciales a partir del audio crudo enviado por el ESP32.
+//
+//  Características calculadas:
+//    RMS (Root Mean Square) — Energía del sonido
+//    ZCR (Zero Crossing Rate) — Turbulencia / irregularidad
+//    FFT (Fast Fourier Transform) — Frecuencias dominantes
+//    Magnitud espectral
+//    Centroide espectral — Indica si la energía está en bajas o altas frecuencias
+//    Wheeze Ratio — Energía en 400–1600 Hz (asma)
+//    Roncus Ratio — Energía en 100–400 Hz (bronquitis)
+//    calcularRuido — Obtención de dB desde audio crudo
+
 
 const { fft_real } = require("./fft");
 
-// RMS – Root Mean Square
-// Mide la energía promedio de la señal.
-// Normal - RMS bajo
-// Sibilancias o roncus → RMS más alto
+// 1. RMS – Root Mean Square
+//    Mide la energía promedio de la señal. Respiración intensa - RMS más alto.
 function rms(buffer) {
   let sum = 0;
   for (let x of buffer) sum += x * x;
   return Math.sqrt(sum / buffer.length);
 }
 
-// ZCR – Zero Crossing Rate
-// Indica turbulencia en la respiración:
-// Valores altos - respiración más agitada
+// 2. ZCR – Zero Crossing Rate
+//    Cuenta los cruces por cero → indica turbulencia o respiración agitada.
 function zcr(buffer) {
   let cruzes = 0;
+
   for (let i = 1; i < buffer.length; i++) {
-    if ((buffer[i - 1] >= 0 && buffer[i] < 0) ||
-        (buffer[i - 1] < 0 && buffer[i] >= 0)) cruzes++;
+    if (
+      (buffer[i - 1] >= 0 && buffer[i] < 0) ||
+      (buffer[i - 1] < 0 && buffer[i] >= 0)
+    ) {
+      cruzes++;
+    }
   }
   return cruzes / buffer.length;
 }
 
-// Magnitud espectral = sqrt(real² + imag²)
+// 3. Magnitud espectral = sqrt(real² + imag²)
 function magnitud(real, imag) {
   return real.map((r, i) => Math.sqrt(r * r + imag[i] * imag[i]));
 }
 
-// Centroide Espectral
-// Señal normal - centroide alto
-// Bronquitis - centroide muy bajo (<300 Hz)
+// 4. Centroide Espectral
+//    Indica dónde está concentrada la energía:
+//  Alto → respiración normal
+//  Muy bajo (< 300 Hz) → roncus / bronquitis
+
 function spectralCentroid(mag, sampleRate = 16000) {
-  let num = 0, den = 0;
+  let num = 0,
+    den = 0;
 
   for (let i = 0; i < mag.length; i++) {
     num += i * mag[i];
@@ -50,14 +65,13 @@ function spectralCentroid(mag, sampleRate = 16000) {
   return (num / den) * freqBin;
 }
 
-// Energía en un rango de frecuencias (útil para Wheeze/Roncus)
-
+// 5. Energía en un rango de frecuencias — usado para Wheeze y Roncus
 function bandEnergy(mag, sampleRate, f1, f2) {
   const n = mag.length;
   const freqPerBin = sampleRate / (2 * n);
 
   const start = Math.floor(f1 / freqPerBin);
-  const end   = Math.floor(f2 / freqPerBin);
+  const end = Math.floor(f2 / freqPerBin);
 
   let sum = 0;
   for (let i = start; i <= end && i < n; i++) {
@@ -65,19 +79,40 @@ function bandEnergy(mag, sampleRate, f1, f2) {
   }
   return sum;
 }
-// Wheeze Ratio – sibilancias típicas del asma
-// Energía entre 400–1600 Hz
+
+// 6. Wheeze Ratio (asma)
+//    Sibilancias típicas entre 400–1600 Hz
 function wheezeRatio(mag, sampleRate = 16000) {
   return bandEnergy(mag, sampleRate, 400, 1600);
 }
 
-// Roncus Ratio – ruidos roncos típicos de bronquitis
-// Energía entre 100–400 Hz
-
+// 7. Roncus Ratio (bronquitis)
+//    Ruidos roncos entre 100–400 Hz
 function roncusRatio(mag, sampleRate = 16000) {
   return bandEnergy(mag, sampleRate, 100, 400);
 }
 
+// 8. calcularRuido — convierte audio crudo 32-bit a decibeles (dB)
+//    IMPORTANTE: Ahora el ESP32 ya no envía dB - el backend lo calcula.
+function calcularRuido(buffer) {
+  if (!buffer?.length) return 0;
+
+  let sum = 0;
+
+  for (let x of buffer) {
+    const norm = x / 2147483648.0; // Conversión entero 32-bit → rango [-1, 1]
+    sum += norm * norm;
+  }
+
+  const rms = Math.sqrt(sum / buffer.length);
+
+  // dB = 20 * log10(rms)
+  const dB = 20 * Math.log10(rms + 0.000001);
+
+  return dB;
+}
+
+// Exportar módulos
 module.exports = {
   rms,
   zcr,
@@ -86,4 +121,5 @@ module.exports = {
   spectralCentroid,
   wheezeRatio,
   roncusRatio,
+  calcularRuido,
 };
