@@ -1,5 +1,6 @@
 // -------------------------------------------------------------
-// pacienteController.js - Versión final estable + registrarConFamiliar
+// pacienteController.js 
+// Incluye: registrarConFamiliar corregido + actualizaciones
 // -------------------------------------------------------------
 const Paciente = require('../models/Paciente');
 const Usuario = require('../models/Usuario');
@@ -8,7 +9,8 @@ const Alerta = require('../models/Alerta');
 const Reporte = require('../models/Reporte');
 const bcrypt = require("bcryptjs");
 
-
+// -------------------------------------------------------------
+// Crear paciente sin familiar
 // -------------------------------------------------------------
 const crearPaciente = async (req, res) => {
   try {
@@ -35,19 +37,20 @@ const crearPaciente = async (req, res) => {
   }
 };
 
+
 // -------------------------------------------------------------
-// NUEVO CONTROLADOR: Registrar PACIENTE + FAMILIAR
+// REGISTRAR PACIENTE + FAMILIAR (VERSIÓN CORREGIDA Y MEJORADA)
 // -------------------------------------------------------------
 const registrarConFamiliar = async (req, res) => {
   try {
     const medicoId = req.usuario.id;
-
     const { paciente, familiar } = req.body;
 
     if (!paciente || !familiar) {
       return res.status(400).json({ error: "Datos incompletos" });
     }
 
+    // 1️ Buscar familiar por correo o cédula
     let familiarUsuario = await Usuario.findOne({
       $or: [
         { email: familiar.correo },
@@ -55,6 +58,7 @@ const registrarConFamiliar = async (req, res) => {
       ]
     });
 
+    // 2️ Si NO existe → CREARLO
     if (!familiarUsuario) {
       familiarUsuario = new Usuario({
         nombre: familiar.nombre,
@@ -69,6 +73,23 @@ const registrarConFamiliar = async (req, res) => {
       await familiarUsuario.save();
     }
 
+    // 3️ Si YA EXISTE → ACTUALIZAR DATOS
+    else {
+      // actualizar si vienen datos nuevos
+      familiarUsuario.nombre = familiar.nombre || familiarUsuario.nombre;
+      familiarUsuario.email = familiar.correo || familiarUsuario.email;
+      familiarUsuario.telefono = familiar.telefono || familiarUsuario.telefono;
+      familiarUsuario.parentesco = familiar.parentesco || familiarUsuario.parentesco;
+
+      //  ACTUALIZAR CÉDULA
+      if (familiar.cedula && familiar.cedula.length === 10) {
+        familiarUsuario.cedula = familiar.cedula;
+      }
+
+      await familiarUsuario.save();
+    }
+
+    // 4️ Crear paciente
     const nuevoPaciente = new Paciente({
       ...paciente,
       medico: medicoId,
@@ -77,13 +98,13 @@ const registrarConFamiliar = async (req, res) => {
 
     await nuevoPaciente.save();
 
-    if (!familiarUsuario.pacientes) familiarUsuario.pacientes = [];
-
+    // 5️ Asociar paciente al familiar
     if (!familiarUsuario.pacientes.includes(nuevoPaciente._id)) {
       familiarUsuario.pacientes.push(nuevoPaciente._id);
       await familiarUsuario.save();
     }
 
+    // 6️ Asociar paciente al médico
     await Usuario.findByIdAndUpdate(medicoId, {
       $addToSet: { pacientes: nuevoPaciente._id }
     });
@@ -102,6 +123,7 @@ const registrarConFamiliar = async (req, res) => {
   }
 };
 
+
 // -------------------------------------------------------------
 // ASOCIAR FAMILIAR A PACIENTE POR CÉDULA
 // -------------------------------------------------------------
@@ -114,35 +136,24 @@ const asociarPorCedula = async (req, res) => {
     }
 
     const paciente = await Paciente.findOne({ cedula: cedulaPaciente });
+    if (!paciente) return res.status(404).json({ error: "Paciente no encontrado" });
 
-    if (!paciente) {
-      return res.status(404).json({ error: "Paciente no encontrado" });
-    }
+    const familiar = await Usuario.findOne({ cedula: cedulaFamiliar, rol: "familiar" });
+    if (!familiar) return res.status(404).json({ error: "Familiar no encontrado" });
 
-    const familiar = await Usuario.findOne({
-      cedula: cedulaFamiliar,
-      rol: "familiar",
-    });
-
-    if (!familiar) {
-      return res.status(404).json({ error: "Familiar no encontrado" });
-    }
-
+    // Asociar ambos lados
     if (!paciente.familiares.includes(familiar._id)) {
       paciente.familiares.push(familiar._id);
-      await paciente.save();
     }
 
     if (!familiar.pacientes.includes(paciente._id)) {
       familiar.pacientes.push(paciente._id);
-      await familiar.save();
     }
 
-    res.json({
-      mensaje: "Asociación realizada con éxito",
-      paciente,
-      familiar,
-    });
+    await paciente.save();
+    await familiar.save();
+
+    res.json({ mensaje: "Asociación realizada con éxito", paciente, familiar });
 
   } catch (error) {
     console.error(error);
@@ -159,13 +170,9 @@ const obtenerPacientes = async (req, res) => {
 
     let pacientes = [];
 
-    // Médico → sus pacientes
     if (rol === "medico") {
       pacientes = await Paciente.find({ medico: usuarioId });
-    }
-
-    // Familiar → los pacientes asociados a él
-    else if (rol === "familiar") {
+    } else if (rol === "familiar") {
       pacientes = await Paciente.find({ familiares: usuarioId });
     }
 
@@ -176,12 +183,13 @@ const obtenerPacientes = async (req, res) => {
   }
 };
 
+
 // -------------------------------------------------------------
 const obtenerPaciente = async (req, res) => {
   try {
     const paciente = await Paciente.findById(req.params.id)
       .populate("medico", "nombre email")
-      .populate("familiares", "nombre email telefono");
+      .populate("familiares", "nombre email telefono cedula parentesco"); // 🔥 agregué cedula
 
     if (!paciente)
       return res.status(404).json({ error: "Paciente no encontrado" });
@@ -191,6 +199,7 @@ const obtenerPaciente = async (req, res) => {
     res.status(500).json({ error: "Error obteniendo paciente" });
   }
 };
+
 
 // -------------------------------------------------------------
 const agregarFamiliar = async (req, res) => {
@@ -222,12 +231,15 @@ const agregarFamiliar = async (req, res) => {
   }
 };
 
+
 // -------------------------------------------------------------
 const obtenerResumenPaciente = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const paciente = await Paciente.findById(id);
+    const paciente = await Paciente.findById(id)
+      .populate("familiares", "nombre cedula parentesco telefono"); // 🔥 extra
+
     if (!paciente)
       return res.status(404).json({ error: "Paciente no encontrado" });
 
@@ -252,6 +264,8 @@ const obtenerResumenPaciente = async (req, res) => {
   }
 };
 
+
+// -------------------------------------------------------------
 module.exports = {
   crearPaciente,
   registrarConFamiliar,
