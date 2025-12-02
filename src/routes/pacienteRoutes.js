@@ -1,11 +1,18 @@
+// -------------------------------------------------------------
+// pacienteRoutes.js - Versión corregida y 100% funcional
+// -------------------------------------------------------------
+
 const express = require('express');
+
+// Importo TODOS los controladores necesarios
 const {
   crearPaciente,
   registrarConFamiliar,
   obtenerPacientes,
   obtenerPaciente,
   agregarFamiliar,
-  obtenerResumenPaciente
+  obtenerResumenPaciente,
+  asociarPorCedula   
 } = require('../controllers/pacienteController');
 
 const authMiddleware = require('../middleware/auth');
@@ -14,82 +21,42 @@ const Paciente = require("../models/Paciente");
 
 const router = express.Router();
 
-// Todas las rutas están protegidas, requieren autenticación
+// Todas las rutas requieren autenticación
 router.use(authMiddleware);
 
-// -------------------------------------------------------------
-// Registrar paciente SOLO (viejo)
-// -------------------------------------------------------------
+
+// Registrar paciente SOLO 
 router.post('/', roleMiddleware(['medico', 'admin']), crearPaciente);
 
-// -------------------------------------------------------------
-// NUEVA RUTA: Registrar paciente + familiar
-// -------------------------------------------------------------
+
+// Registrar paciente + familiar (este lo agg recien)
 router.post(
   "/registrar-con-familiar",
   roleMiddleware(["medico", "admin"]),
   registrarConFamiliar
 );
 
-// -------------------------------------------------------------
-// Obtener todos los pacientes del usuario
-// -------------------------------------------------------------
+
+// Obtener todos los pacientes del usuario logueado
 router.get('/', roleMiddleware(['medico', 'familiar', 'admin']), obtenerPacientes);
 
-// -------------------------------------------------------------
-// Obtener paciente por ID
-// -------------------------------------------------------------
+
+// Obtener un paciente por ID
 router.get('/:id', roleMiddleware(['medico', 'familiar', 'admin']), obtenerPaciente);
 
-// -------------------------------------------------------------
-// Asociar familiar manualmente (opcional)
-// -------------------------------------------------------------
+
+// Asociar familiar manualmente por ID
 router.post('/:pacienteId/familiares', roleMiddleware(['medico', 'admin']), agregarFamiliar);
 
-// -------------------------------------------------------------
+
 // Resumen del paciente
-// -------------------------------------------------------------
 router.get('/:id/resumen', roleMiddleware(['medico', 'familiar', 'admin']), obtenerResumenPaciente);
 
-// -------------------------------------------------------------
-// Asignar medico (temporal)
-// -------------------------------------------------------------
-router.put(
-  "/asignar-medico/:id",
-  roleMiddleware(['admin', 'medico']),
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { medicoId } = req.body;
-
-      const paciente = await Paciente.findByIdAndUpdate(
-        id,
-        { medico: medicoId },
-        { new: true }
-      );
-
-      if (!paciente) {
-        return res.status(404).json({ error: "Paciente no encontrado" });
-      }
-
-      res.json({
-        mensaje: "Médico asignado correctamente",
-        paciente
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Error asignando médico" });
-    }
-  }
-);
-
-// -------------------------------------------------------------
-// ASOCIAR FAMILIAR A PACIENTE POR CÉDULA
-// -------------------------------------------------------------
+// Asociar familiar a paciente usando CÉDULAS
 router.post(
   "/asociar-cedula",
   roleMiddleware(["medico", "admin"]),
-  asociarPorCedula
+  asociarPorCedula   // ← AHORA SÍ EXISTE Y FUNCIONA
 );
-
 
 module.exports = router;
