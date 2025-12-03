@@ -1,26 +1,25 @@
 function analizarRespiracion(data) {
   const dB = data.ruido;
-  //clasificacion
 
-  //  BRONQUITIS (más fuerte)
-  if (dB >= -80 && dB <= -60) return "Bronquitis";
+  if (dB >= -80 && dB <= -56) return "Normal";
+  if (dB >= -55 && dB <= -40) return "Asma";
+  if (dB >= -39 && dB <= -20) return "Bronquitis";
 
-  //  ASMA (medio)
-  if (dB >= -59 && dB <= -40) return "Asma";
-
-  //  NORMAL (suave)
-  if (dB >= -39 && dB <= -20) return "Normal";
-
-  // Si está fuera de rango (raro), analizar por audio
+ 
   return analizarPorAudio(data);
 }
 
+
 function analizarPorAudio(data) {
   const audio = data.audio_raw;
+
+  // Si no hay audio - regresar Normal
   if (!audio || audio.length < 128) return "Normal";
 
+  // Normalizar audio 32-bit - [-1, 1]
   const norm = audio.map(x => x / 2147483648.0);
 
+  // ---------- Características básicas ----------
   const r = rms(norm);
   const z = zcr(norm);
   const { real, imag } = fft_real(norm);
@@ -30,14 +29,16 @@ function analizarPorAudio(data) {
   const wheeze = wheezeRatio(mag);
   const roncus = roncusRatio(mag);
 
-  // Respaldo por patrones
-  if (roncus > wheeze && centroid < 400) return "Bronquitis";
+  // ---------- REGLAS RESPALDO ----------
+  // Sibilancias - ASMA
   if (wheeze > roncus && centroid > 800) return "Asma";
+
+  // Roncus - BRONQUITIS
+  if (roncus > wheeze && centroid < 400) return "Bronquitis";
 
   return "Normal";
 }
-
-
+//features.js
 const {
   rms,
   zcr,
@@ -48,4 +49,6 @@ const {
   roncusRatio
 } = require("./features");
 
+
+// Exportar
 module.exports = { analizarRespiracion };
