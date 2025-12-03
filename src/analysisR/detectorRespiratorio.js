@@ -1,35 +1,51 @@
-//  Reglas principales de decisión (sin FFT)
 function analizarRespiracion(data) {
-  const dB = data.ruido ?? -80;           // energía
-  const rms = data.rms ?? 0;              // intensidad temporal
-  const zcr = data.zcr ?? 0;              // turbulencia de flujo de aire
+  const dB = data.ruido;
+  //clasificacion
 
-  // REGLA 1 — BRONQUITIS (muy ruidoso, respiración pesada)
-  // Características típicas:
-  //  - dB > -40  (ruido profundo)
-  //  - RMS alto
-  if (dB > -40 || rms > 0.12) {
-    return "Bronquitis";
-  }
+  //  BRONQUITIS (más fuerte)
+  if (dB >= -80 && dB <= -60) return "Bronquitis";
 
+  //  ASMA (medio)
+  if (dB >= -59 && dB <= -40) return "Asma";
 
-  // REGLA 2 — ASMA (sibilancias suaves)
-  //  - dB entre -55 y -40
-  //  - ZCR alto -> turbulencia (sibilancia)
+  //  NORMAL (suave)
+  if (dB >= -39 && dB <= -20) return "Normal";
 
-  if (dB <= -40 && dB >= -55) {
-    if (zcr > 0.10) {
-      return "Asma";
-    }
-    // Si el dB esta en rango de asma pero sin turbulencia.
-    return "Asma";
-  }
+  // Si está fuera de rango (raro), analizar por audio
+  return analizarPorAudio(data);
+}
 
-  // REGLA 3 — NORMAL 
-  //  - dB < -55
-  //  - RMS muy bajo
+function analizarPorAudio(data) {
+  const audio = data.audio_raw;
+  if (!audio || audio.length < 128) return "Normal";
+
+  const norm = audio.map(x => x / 2147483648.0);
+
+  const r = rms(norm);
+  const z = zcr(norm);
+  const { real, imag } = fft_real(norm);
+  const mag = magnitud(real, imag);
+
+  const centroid = spectralCentroid(mag);
+  const wheeze = wheezeRatio(mag);
+  const roncus = roncusRatio(mag);
+
+  // Respaldo por patrones
+  if (roncus > wheeze && centroid < 400) return "Bronquitis";
+  if (wheeze > roncus && centroid > 800) return "Asma";
+
   return "Normal";
 }
 
+
+const {
+  rms,
+  zcr,
+  fft_real,
+  magnitud,
+  spectralCentroid,
+  wheezeRatio,
+  roncusRatio
+} = require("./features");
 
 module.exports = { analizarRespiracion };
