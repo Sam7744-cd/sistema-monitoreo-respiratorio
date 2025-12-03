@@ -85,22 +85,25 @@ exports.recibirMedicion = async (req, res) => {
 };
 
 
-
-   //OBTENER ÚLTIMA MEDICIÓN (app móvil)
-   //La app consulta cada 2–3 segundos para ver los cambios.
-
+// OBTENER ÚLTIMA MEDICIÓN DEL PACIENTE SELECCIONADO
 exports.obtenerActual = async (req, res) => {
   try {
-    const ultima = await MedicionTiempoReal.findOne()
-      .sort({ createdAt: -1 })
-      .populate("paciente");
+    const pacienteId = getPacienteActual(); // ← USAR EL PACIENTE SELECCIONADO
+
+    if (!pacienteId) {
+      return res.status(400).json({ msg: "No hay paciente seleccionado" });
+    }
+
+    // Buscar SOLO mediciones del paciente seleccionado
+    const ultima = await MedicionTiempoReal.findOne({ paciente: pacienteId })
+      .sort({ createdAt: -1 });
 
     if (!ultima) {
       return res.json({ msg: "No hay datos aún" });
     }
 
     return res.json({
-      paciente: ultima.paciente._id,
+      paciente: ultima.paciente,
 
       movX: ultima.movX,
       movY: ultima.movY,
