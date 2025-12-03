@@ -1,9 +1,9 @@
 function analizarRespiracion(data) {
   const dB = data.ruido;
 
-  if (dB >= -80 && dB <= -70) return "Normal";
-  if (dB >= -69 && dB <= -50) return "Bronquitis";
-  if (dB >= -49 && dB <= -20) return "Asma";
+  if (dB >= -80 && dB <= -75) return "Normal";
+  if (dB >= -74 && dB <= -60) return "Bronquitis";
+  if (dB >= -59 && dB <= -20) return "Asma";
 
  
   return analizarPorAudio(data);

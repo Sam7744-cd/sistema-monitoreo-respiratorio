@@ -1,19 +1,3 @@
-//  features.js - Cálculo de características de audio
-//  Este módulo implementa todas las características necesarias para el análisis
-//  respiratorio determinístico. Aquí se calculan métricas temporales y
-//  frecuenciales a partir del audio crudo enviado por el ESP32.
-//
-//  Características calculadas:
-//    RMS (Root Mean Square) — Energía del sonido
-//    ZCR (Zero Crossing Rate) — Turbulencia / irregularidad
-//    FFT (Fast Fourier Transform) — Frecuencias dominantes
-//    Magnitud espectral
-//    Centroide espectral — Indica si la energía está en bajas o altas frecuencias
-//    Wheeze Ratio — Energía en 400–1600 Hz (asma)
-//    Roncus Ratio — Energía en 100–400 Hz (bronquitis)
-//    calcularRuido — Obtención de dB desde audio crudo
-
-
 const { fft_real } = require("./fft");
 
 // 1. RMS – Root Mean Square
