@@ -1,6 +1,7 @@
 const MedicionTiempoReal = require("../models/medicionTiempoReal");
 const { getPacienteActual } = require("./tiempoRealSeleccionController");
 const { analizarRespiracion } = require("../analysisR/detectorRespiratorio");
+const MedicionHistorica = require("../models/MedicionHistorica");
 
 /* ----------------------------------------------------------------
     RECIBIR MEDICIÓN DEL ESP32
@@ -75,6 +76,26 @@ exports.recibirMedicion = async (req, res) => {
       diagnostico,
       alerta: diagnostico !== "Normal",
     });
+
+    // GUARDADO HISTÓRICO PARA DATASET Y TESIS
+    await MedicionHistorica.create({
+      paciente: pacienteId,
+
+      movX: safe.movX,
+      movY: safe.movY,
+      movZ: safe.movZ,
+
+      ruido: safe.ruido,
+      rms: safe.rms,
+      zcr: safe.zcr,
+      spectral_centroid: safe.spectral_centroid,
+      wheeze_ratio: safe.wheeze_ratio,
+      roncus_ratio: safe.roncus_ratio,
+
+      audio_fft: safe.audio_fft,
+      diagnostico,
+    });
+
 
     return res.json(medicion);
 
