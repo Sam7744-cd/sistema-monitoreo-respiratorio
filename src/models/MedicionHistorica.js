@@ -31,8 +31,7 @@ const MedicionHistoricaSchema = new mongoose.Schema(
     // Diagnóstico calculado
     diagnostico: {
       type: String,
-      enum: ["Normal", "Asma", "Bronquitis", "Indeterminado"],
-      default: "Indeterminado",
+      default:"por determinar"
     },
   },
   { timestamps: true }

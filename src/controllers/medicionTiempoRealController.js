@@ -93,7 +93,7 @@ exports.recibirMedicion = async (req, res) => {
       roncus_ratio: safe.roncus_ratio,
 
       audio_fft: safe.audio_fft,
-      diagnostico,
+      diagnostico: "por determinar"
     });
 
 
