@@ -1,20 +1,12 @@
 const MedicionTiempoReal = require("../models/medicionTiempoReal");
 const { getPacienteActual } = require("./tiempoRealSeleccionController");
-const { analizarRespiracion } = require("../analysisR/detectorRespiratorio");
 const MedicionHistorica = require("../models/MedicionHistorica");
+const { classify } = require("../analysis/classifier");
 
-/* ----------------------------------------------------------------
-    RECIBIR MEDICIÓN DEL ESP32
-   Aquí el backend procesa los datos crudos enviados por el ESP32:
-   - Movimiento (MPU6050)
-   - Características de audio
-   - Señal FFT (opcional si envías el array)
-   Después usa el analizador (detectorRespiratorio.js) para generar
-   el diagnóstico real del backend.
-   ------------------------------------------------------------- */
+
+// RECIBIR MEDICIÓN DEL ESP32
 exports.recibirMedicion = async (req, res) => {
   try {
-    // 1) Verificar que la app seleccionó un paciente antes de medir
     const pacienteId = getPacienteActual();
 
     if (!pacienteId) {
@@ -23,12 +15,7 @@ exports.recibirMedicion = async (req, res) => {
       });
     }
 
-    // Datos crudos enviados por el ESP32
     const data = req.body;
-
-
-       //Sanitizar valores para evitar "undefined"
-       //Esto evita que Mongo o el análisis fallen por faltantes.
 
     const safe = {
       movX: data.movX ?? 0,
@@ -39,24 +26,14 @@ exports.recibirMedicion = async (req, res) => {
       rms: data.rms ?? 0,
       zcr: data.zcr ?? 0,
       spectral_centroid: data.spectral_centroid ?? 0,
-      wheeze_ratio: data.wheeze_ratio ?? 0,
-      roncus_ratio: data.roncus_ratio ?? 0,
 
-      // FFT (si la envías desde el ESP32)
-      audio_fft: data.audio_fft ?? [],
+      audio_fft: data.audio_fft ?? []
     };
 
+    // CLASIFICACIÓN REAL SIN IFs DE DECISIÓN
+    const diagnostico = classify(safe);
 
-       //2) Análisis respiratorio en el backend
-       //Esta función decide: Normal / Asma / Bronquitis
-       //usando reglas determinísticas + FFT (si existe).
-
-    const diagnostico = analizarRespiracion(safe);
-
-
-       // 3) Guardar en MongoDB
-       //Aquí se almacena TODO lo medido y el diagnóstico final.
-
+    // Guardar última medición (para la app)
     const medicion = await MedicionTiempoReal.create({
       paciente: pacienteId,
 
@@ -68,16 +45,14 @@ exports.recibirMedicion = async (req, res) => {
       rms: safe.rms,
       zcr: safe.zcr,
       spectral_centroid: safe.spectral_centroid,
-      wheeze_ratio: safe.wheeze_ratio,
-      roncus_ratio: safe.roncus_ratio,
 
-      audio_fft: safe.audio_fft, // si se envía FFT
+      audio_fft: safe.audio_fft,
 
       diagnostico,
-      alerta: diagnostico !== "Normal",
+      alerta: diagnostico !== "normal"
     });
 
-    // GUARDADO HISTÓRICO PARA DATASET Y TESIS
+    // Guardar histórico (dataset)
     await MedicionHistorica.create({
       paciente: pacienteId,
 
@@ -89,13 +64,10 @@ exports.recibirMedicion = async (req, res) => {
       rms: safe.rms,
       zcr: safe.zcr,
       spectral_centroid: safe.spectral_centroid,
-      wheeze_ratio: safe.wheeze_ratio,
-      roncus_ratio: safe.roncus_ratio,
 
       audio_fft: safe.audio_fft,
       diagnostico: "por determinar"
     });
-
 
     return res.json(medicion);
 
@@ -106,16 +78,15 @@ exports.recibirMedicion = async (req, res) => {
 };
 
 
-// OBTENER ÚLTIMA MEDICIÓN DEL PACIENTE SELECCIONADO
+// OBTENER ÚLTIMA MEDICIÓN PARA MOSTRAR EN TIEMPO REAL
 exports.obtenerActual = async (req, res) => {
   try {
-    const pacienteId = getPacienteActual(); // ← USAR EL PACIENTE SELECCIONADO
+    const pacienteId = getPacienteActual();
 
     if (!pacienteId) {
       return res.status(400).json({ msg: "No hay paciente seleccionado" });
     }
 
-    // Buscar SOLO mediciones del paciente seleccionado
     const ultima = await MedicionTiempoReal.findOne({ paciente: pacienteId })
       .sort({ createdAt: -1 });
 
@@ -125,23 +96,16 @@ exports.obtenerActual = async (req, res) => {
 
     return res.json({
       paciente: ultima.paciente,
-
       movX: ultima.movX,
       movY: ultima.movY,
       movZ: ultima.movZ,
-
       ruido: ultima.ruido,
       rms: ultima.rms,
       zcr: ultima.zcr,
       spectral_centroid: ultima.spectral_centroid,
-      wheeze_ratio: ultima.wheeze_ratio,
-      roncus_ratio: ultima.roncus_ratio,
-
       audio_fft: ultima.audio_fft ?? [],
-
       diagnostico: ultima.diagnostico,
       alerta: ultima.alerta,
-
       timestamp: ultima.createdAt,
     });
 
