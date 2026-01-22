@@ -30,7 +30,7 @@ exports.recibirMedicion = async (req, res) => {
       audio_fft: data.audio_fft ?? []
     };
 
-    // CLASIFICACIÓN REAL SIN IFs DE DECISIÓN
+    // CLASIFICACIÓN 
     const diagnostico = classify(safe);
 
     // Guardar última medición (para la app)
