@@ -3,6 +3,8 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const Usuario = require("../models/Usuario");
 const Paciente = require("../models/Paciente");
+const usuarioController = require("../controllers/usuarioController");
+const verificarRol = require("../middleware/verificarRol");
 
 router.use(authMiddleware);
 
@@ -30,5 +32,13 @@ router.get("/mis-pacientes", async (req, res) => {
     res.status(500).json({ error: "Error obteniendo pacientes del familiar" });
   }
 });
+// -----------------------------------------
+// ASOCIAR PACIENTE A UN FAMILIAR (MEDICO)
+// -----------------------------------------
+router.post(
+  "/asociar-paciente",
+  verificarRol("medico", "admin"),
+  usuarioController.asociarPaciente
+);
 
 module.exports = router;

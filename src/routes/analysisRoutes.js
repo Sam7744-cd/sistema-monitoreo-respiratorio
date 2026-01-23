@@ -5,7 +5,7 @@ const multer = require('multer');
 const router = express.Router();
 
 // Importación de la lógica de análisis y modelo de medición
-const RuleClassifier = require('../analysis/ruleClassifier');
+const classifier = require('../analysis/classifier');
 const AudioProcessor = require('../analysis/audioProcessor');
 const Medicion = require('../models/medicion'); // Modelo para guardar los resultados
 
@@ -32,7 +32,7 @@ router.post('/detect-file', upload.single('file'), async (req, res) => {
     const features = await AudioProcessor.extraerCaracteristicas(audioBuffer);
 
     // Clasifico el audio usando reglas que yo definí (heurísticas simples)
-    const resultado = RuleClassifier.clasificar(features);
+    const resultado = classifier.clasificar(features);
 
     // Opcional: podría guardar el resultado en MongoDB usando el modelo Medicion
     // Aquí no se está haciendo en este archivo, pero puede agregarse si se desea
