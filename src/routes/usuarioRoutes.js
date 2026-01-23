@@ -13,7 +13,7 @@ router.use(authMiddleware);
 // -----------------------------------------
 router.get("/mis-pacientes", async (req, res) => {
   try {
-    const userId = req.usuario.id;
+    const userId = req.user.id;
 
     const usuario = await Usuario.findById(userId);
 

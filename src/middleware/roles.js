@@ -11,7 +11,7 @@ const roleMiddleware = (rolesPermitidos) => {
       }
 
       // Si el rol del usuario no está entre los permitidos
-      if (!rolesPermitidos.includes(req.usuario.rol)) {
+      if (!rolesPermitidos.includes(req.user.rol)) {
         return res.status(403).json({
           error: `Acceso denegado. Se requiere rol: ${rolesPermitidos.join(', ')}`
         });
