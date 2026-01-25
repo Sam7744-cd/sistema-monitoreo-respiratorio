@@ -42,3 +42,7 @@ router.post(
 );
 
 module.exports = router;
+
+router.get("/test", (req, res) => {
+  res.json({ ok: true });
+});
