@@ -13,7 +13,7 @@ console.log(">>> usuarioRoutes cargado <<<");
 // -----------------------------------------
 router.get("/mis-pacientes", async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.usuario.id;
 
     const usuario = await Usuario.findById(userId);
 
@@ -43,6 +43,9 @@ router.post(
 
 module.exports = router;
 
-router.get("/test", (req, res) => {
-  res.json({ ok: true });
+router.get("/test-auth", (req, res) => {
+  res.json({
+    mensaje: "Token recibido",
+    user: req.usuario
+  });
 });
