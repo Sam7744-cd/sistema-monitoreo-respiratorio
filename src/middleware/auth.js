@@ -22,6 +22,7 @@ const authMiddleware = async (req, res, next) => {
       });
     }
     req.user = usuario;
+    req.usuario = usuario; // Para compatibilidad con otros middlewares
 
     next();
   } catch (error) {
