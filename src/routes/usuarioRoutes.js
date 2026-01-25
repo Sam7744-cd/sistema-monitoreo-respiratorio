@@ -37,7 +37,7 @@ router.get("/mis-pacientes", async (req, res) => {
 // -----------------------------------------
 router.post(
   "/asociar-paciente",
-  verificarRol("medico", "admin"),
+  authMiddleware,
   usuarioController.asociarPaciente
 );
 
