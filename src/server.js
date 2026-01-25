@@ -10,7 +10,7 @@ connectDB();
 
 const app = express();
 //rutas relacionadas con el análisis de audio
-const analysisRoutes = require('./routes/analysisRoutes');
+//const analysisRoutes = require('./routes/analysisRoutes');
 
 // MIDDLEWARES GLOBALES
 // Configuro CORS para permitir peticiones desde cualquier origen
@@ -23,7 +23,7 @@ app.use(express.json({ limit: '10mb' })); // permite JSON grande (base64)
 app.use('/api/auth', require('./routes/authRoutes')); // Registro y login
 app.use('/api/pacientes', require('./routes/pacienteRoutes')); // Gestión de pacientes
 app.use('/api/mediciones', require('./routes/medicionRoutes')); // Registro y consulta de mediciones
-app.use('/api/analysis', analysisRoutes); // Procesamiento y análisis de audio
+//app.use('/api/analysis', analysisRoutes); // Procesamiento y análisis de audio
 app.use('/api/alertas', require('./routes/alertaRoutes')); // Alwrtas medicas (se usan para guardar y consultar alertas generadas por las mediciones)
 app.use('/api/reportes', require('./routes/reporteRoutes')); //reportes medicos
 app.use('/api/dispositivos', require('./routes/dispositivoRoutes')); // registrar o consultar dispositivos
