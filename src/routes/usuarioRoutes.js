@@ -7,7 +7,7 @@ const usuarioController = require("../controllers/usuarioController");
 const verificarRol = require("../middleware/verificarRol");
 
 router.use(authMiddleware);
-
+console.log(">>> usuarioRoutes cargado <<<");
 // -----------------------------------------
 // OBTENER LOS PACIENTES DEL FAMILIAR LOGUEADO
 // -----------------------------------------
