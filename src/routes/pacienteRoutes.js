@@ -18,6 +18,7 @@ const {
 const authMiddleware = require('../middleware/auth');
 const roleMiddleware = require('../middleware/roles');
 const Paciente = require("../models/Paciente");
+const { actualizarPaciente } = require('../controllers/pacienteController');
 
 const router = express.Router();
 
@@ -57,6 +58,13 @@ router.post(
   "/asociar-cedula",
   roleMiddleware(["medico", "admin"]),
   asociarPorCedula   // ← AHORA SÍ EXISTE Y FUNCIONA
+);
+
+// Actualizar paciente
+router.put(
+  "/:id",
+  roleMiddleware(["medico", "admin"]),
+  actualizarPaciente
 );
 
 module.exports = router;

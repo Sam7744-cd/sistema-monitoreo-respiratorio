@@ -267,6 +267,40 @@ const obtenerResumenPaciente = async (req, res) => {
   }
 };
 
+// -------------------------------------------------------------
+// ACTUALIZAR PACIENTE
+// -------------------------------------------------------------
+const actualizarPaciente = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const paciente = await Paciente.findById(id);
+    if (!paciente) {
+      return res.status(404).json({ error: "Paciente no encontrado" });
+    }
+
+    // actualizar campos permitidos
+    paciente.nombre = req.body.nombre ?? paciente.nombre;
+    paciente.edad = req.body.edad ?? paciente.edad;
+    paciente.sexo = req.body.sexo ?? paciente.sexo;
+    paciente.telefono = req.body.telefono ?? paciente.telefono;
+    paciente.direccion = req.body.direccion ?? paciente.direccion;
+    paciente.correo = req.body.correo ?? paciente.correo;
+
+    await paciente.save();
+
+    res.json({
+      mensaje: "Paciente actualizado correctamente",
+      paciente
+    });
+  } catch (error) {
+    console.error("ERROR actualizarPaciente:", error);
+    res.status(400).json({
+      error: error.message
+    });
+  }
+};
+
 
 // -------------------------------------------------------------
 module.exports = {
@@ -276,5 +310,6 @@ module.exports = {
   obtenerPacientes,
   obtenerPaciente,
   agregarFamiliar,
-  obtenerResumenPaciente
+  obtenerResumenPaciente,
+  actualizarPaciente
 };
