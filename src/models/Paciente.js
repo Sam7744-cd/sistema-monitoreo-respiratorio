@@ -1,28 +1,68 @@
 const mongoose = require('mongoose');
 
-// Esquema para almacenar los datos de los pacientes registrados
-const pacienteSchema = new mongoose.Schema({
-  // Información personal básica
-  nombre: { type: String, trim: true },
-  cedula: { type: String, trim: true }, // Opcional: puede usarse para identificar
-  edad: { type: Number },
-  sexo: { type: String, enum: ['Masculino', 'Femenino'], default: undefined },
-  direccion: { type: String, trim: true },
-  telefono: { type: String, trim: true },
-  correo: { type: String, trim: true, lowercase: true },
+const pacienteSchema = new mongoose.Schema(
+  {
+    nombre: {
+      type: String,
+      required: true,
+      trim: true
+    },
 
-  // Información médica
-  peso: { type: Number },
-  altura: { type: Number },
+    cedula: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      match: /^\d{10}$/ // exactamente 10 dígitos
+    },
 
-  // Relación con el médico principal (usuario tipo 'medico')
-  medico: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' },
+    edad: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 5
+    },
 
-  // Familiares que también pueden consultar los datos del paciente
-  familiares: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }]
-}, {
-  timestamps: true // Crea createdAt y updatedAt
-});
+    sexo: {
+      type: String,
+      required: true,
+      enum: ['Masculino', 'Femenino']
+    },
 
-// Exportamos el modelo, previniendo errores si ya está cargado
-module.exports = mongoose.models.Paciente || mongoose.model('Paciente', pacienteSchema);
+    direccion: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    telefono: {
+      type: String,
+      required: true,
+      match: /^\d{10}$/ // exactamente 10 dígitos
+    },
+
+    correo: {
+      type: String,
+      trim: true,
+      lowercase: true
+    },
+
+    peso: Number,
+    altura: Number,
+
+    medico: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Usuario',
+      required: true
+    },
+
+    familiares: [
+      { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }
+    ]
+  },
+  { timestamps: true }
+);
+
+module.exports =
+  mongoose.models.Paciente ||
+  mongoose.model('Paciente', pacienteSchema);

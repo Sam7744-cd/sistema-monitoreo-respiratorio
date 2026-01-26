@@ -1,7 +1,4 @@
-// -------------------------------------------------------------
 // pacienteController.js 
-// Incluye: registrarConFamiliar corregido + actualizaciones
-// -------------------------------------------------------------
 const Paciente = require('../models/Paciente');
 const Usuario = require('../models/Usuario');
 const Medicion = require('../models/medicion');
@@ -9,12 +6,18 @@ const Alerta = require('../models/Alerta');
 const Reporte = require('../models/Reporte');
 const bcrypt = require("bcryptjs");
 
-// -------------------------------------------------------------
-// Crear paciente sin familiar
-// -------------------------------------------------------------
 const crearPaciente = async (req, res) => {
   try {
     const medicoId = req.usuario.id;
+    const { cedula } = req.body;
+
+    //  evitar duplicados por cédula
+    const existe = await Paciente.findOne({ cedula });
+    if (existe) {
+      return res.status(400).json({
+        error: "Ya existe un paciente registrado con esta cédula"
+      });
+    }
 
     const paciente = new Paciente({
       ...req.body,
@@ -25,7 +28,7 @@ const crearPaciente = async (req, res) => {
     await paciente.save();
 
     await Usuario.findByIdAndUpdate(medicoId, {
-      $push: { pacientes: paciente._id }
+      $addToSet: { pacientes: paciente._id }
     });
 
     res.status(201).json({
@@ -33,14 +36,14 @@ const crearPaciente = async (req, res) => {
       paciente
     });
   } catch (error) {
-    res.status(500).json({ error: "Error creando paciente: " + error.message });
+    res.status(400).json({
+      error: error.message
+    });
   }
 };
 
 
-// -------------------------------------------------------------
-// REGISTRAR PACIENTE + FAMILIAR (VERSIÓN CORREGIDA Y MEJORADA)
-// -------------------------------------------------------------
+// REGISTRAR PACIENTE + FAMILIAR 
 const registrarConFamiliar = async (req, res) => {
   try {
     const medicoId = req.usuario.id;
@@ -58,7 +61,7 @@ const registrarConFamiliar = async (req, res) => {
       ]
     });
 
-    // 2️ Si NO existe → CREARLO
+    // 2️ Si NO existe - CREARLO
     if (!familiarUsuario) {
       familiarUsuario = new Usuario({
         nombre: familiar.nombre,
@@ -73,7 +76,7 @@ const registrarConFamiliar = async (req, res) => {
       await familiarUsuario.save();
     }
 
-    // 3️ Si YA EXISTE → ACTUALIZAR DATOS
+    // 3️ Si YA EXISTE - ACTUALIZAR DATOS
     else {
       // actualizar si vienen datos nuevos
       familiarUsuario.nombre = familiar.nombre || familiarUsuario.nombre;
