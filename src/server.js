@@ -28,7 +28,8 @@ app.use('/api/alertas', require('./routes/alertaRoutes')); // Alwrtas medicas (s
 app.use('/api/reportes', require('./routes/reporteRoutes')); //reportes medicos
 app.use('/api/dispositivos', require('./routes/dispositivoRoutes')); // registrar o consultar dispositivos
 app.use("/api/usuarios", require("./routes/usuarioRoutes")); //traer paciente 
-app.use("/api/ml", mlRoutes);  //rutas relacionadas con el análisis de audio
+app.use("/api/ml", require("./routes/mlRoutes"));
+ //rutas relacionadas con el análisis de audio
 //Ruta tiempo real
 app.use('/api/tiempo-real', require('./routes/medicionTiempoRealRoutes'));
 
