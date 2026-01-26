@@ -28,18 +28,29 @@ const MedicionSchema = new mongoose.Schema({
   // Nombre del archivo de audio o base64 si se usa
   audio: String,
 
-  // Datos del acelerómetro (por si se mide movimiento respiratorio)
+  // Datos del acelerómetro
   acelerometro: {
     x: Number,
     y: Number,
     z: Number
   },
 
-  // Resultado del análisis con el diagnóstico
+  // Resultado del análisis con el diagnóstico ML
   resultado: {
-    tipo: String, // "asma", "bronquitis", "normal", etc.
-    confianza: Number // Valor entre 0 a 100 indicando precisión
+    tipo: {
+      type: String,
+      default: "por determinar"
+    },
+    confianza: {
+      type: Number,
+      default: 0
+    }
   }
+}, {
+  timestamps: true
 });
 
-module.exports = mongoose.model('Medicion', MedicionSchema);
+// ESTA LÍNEA EVITA EL ERROR
+module.exports =
+  mongoose.models.Medicion ||
+  mongoose.model('Medicion', MedicionSchema);
