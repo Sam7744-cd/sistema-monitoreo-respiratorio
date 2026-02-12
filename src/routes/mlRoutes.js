@@ -7,7 +7,8 @@ router.post("/predict/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const medicion = await Medicion.findById(id);
+    const medicion = await Medicion.findOne({ _identificación: id });
+
 
     if (!medicion) {
       return res.status(404).json({ error: "Medición no encontrada" });

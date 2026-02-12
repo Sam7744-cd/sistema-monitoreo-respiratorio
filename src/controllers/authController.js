@@ -103,7 +103,76 @@ const login = async (req, res) => {
   }
 };
 
+
+// =============================
+// ACTUALIZAR PERFIL
+// =============================
+const actualizarPerfil = async (req, res) => {
+  try {
+    const userId = req.usuario.id;
+
+    const { nombre, telefono } = req.body;
+
+    const usuario = await Usuario.findById(userId);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    usuario.nombre = nombre ?? usuario.nombre;
+    usuario.telefono = telefono ?? usuario.telefono;
+
+    await usuario.save();
+
+    res.json({
+      mensaje: "Perfil actualizado correctamente",
+      usuario: {
+        id: usuario._id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        telefono: usuario.telefono
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+
+// CAMBIAR CONTRASEÑA
+const cambiarPassword = async (req, res) => {
+  try {
+    const userId = req.usuario.id;
+    const { passwordActual, nuevaPassword } = req.body;
+
+    const usuario = await Usuario.findById(userId);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const coincide = await bcrypt.compare(passwordActual, usuario.password);
+    if (!coincide) {
+      return res.status(400).json({ error: "Contraseña actual incorrecta" });
+    }
+
+    const hashed = await bcrypt.hash(nuevaPassword, 10);
+    usuario.password = hashed;
+
+    await usuario.save();
+
+    res.json({ mensaje: "Contraseña actualizada correctamente" });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
 module.exports = {
   registrar,
-  login
+  login,
+  actualizarPerfil,
+  cambiarPassword
 };
