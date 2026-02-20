@@ -1,4 +1,3 @@
-// src/models/medicion.js
 const mongoose = require('mongoose');
 
 const MedicionSchema = new mongoose.Schema({
@@ -9,16 +8,10 @@ const MedicionSchema = new mongoose.Schema({
   },
 
   frecuencia_respiratoria: Number,
+  ruido: Number,
+
   sibilancias: Number,
   roncus: Number,
-
-  audio: String,
-
-  acelerometro: {
-    x: Number,
-    y: Number,
-    z: Number
-  },
 
   resultado: {
     tipo: {
@@ -29,15 +22,26 @@ const MedicionSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
+  },
+
+  features: {
+    rms: Number,
+    zcr: Number,
+    centroide: Number,
+    espectral: Number
+  },
+
+  acelerometro: {
+    x: Number,
+    y: Number,
+    z: Number
   }
+
 }, {
   timestamps: true,
-
-
-  collection: "mediciones_historicas"
+  collection: "mediciones"  //  TODO VA AQUÍ
 });
 
-// evita overwrite model
 module.exports =
   mongoose.models.Medicion ||
   mongoose.model("Medicion", MedicionSchema);
