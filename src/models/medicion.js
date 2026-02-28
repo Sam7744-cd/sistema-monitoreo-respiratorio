@@ -39,7 +39,7 @@ const MedicionSchema = new mongoose.Schema({
 
 }, {
   timestamps: true,
-  collection: "mediciones"  //  TODO VA AQUÍ
+  collection: "Mediciones"  //  TODO VA AQUÍ
 });
 
 module.exports =
