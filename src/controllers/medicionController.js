@@ -41,7 +41,7 @@ const obtenerHistorial = async (req, res) => {
     const { pacienteId } = req.params;
 
     // Buscamos todas las mediciones asociadas al paciente ordenadas por fecha
-    const mediciones = await Medicion.find({ paciente: pacienteId }).sort({ timestamp: -1 });
+    const mediciones = await Medicion.find({ paciente: pacienteId }).sort({ createdAt: -1 });
 
     res.json( mediciones );
   } catch (error) {
