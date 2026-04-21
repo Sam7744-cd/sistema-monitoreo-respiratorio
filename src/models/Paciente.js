@@ -1,68 +1,49 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+
+const responsableSchema = new mongoose.Schema(
+  {
+    nombre: { type: String, required: true, trim: true },
+    cedula: { type: String, required: true, trim: true, match: /^\d{10}$/ },
+    telefono: { type: String, required: true, match: /^\d{10}$/ },
+    correo: { type: String, trim: true, lowercase: true },
+    parentesco: { type: String, required: true, trim: true },
+  },
+  { _id: false }
+);
 
 const pacienteSchema = new mongoose.Schema(
   {
-    nombre: {
-      type: String,
-      required: true,
-      trim: true
-    },
+    nombres: { type: String, required: true, trim: true },
+    apellidos: { type: String, required: true, trim: true },
 
     cedula: {
       type: String,
       required: true,
       unique: true,
       trim: true,
-      match: /^\d{10}$/ // exactamente 10 dígitos
+      match: /^\d{10}$/,
     },
 
-    edad: {
-      type: Number,
-      required: true,
-      min: 0,
-      max: 5
-    },
+    fechaNacimiento: { type: Date, required: true },
 
-    sexo: {
-      type: String,
-      required: true,
-      enum: ['Masculino', 'Femenino']
-    },
+    sexo: { type: String, required: true, enum: ["Masculino", "Femenino"] },
 
-    direccion: {
-      type: String,
-      required: true,
-      trim: true
-    },
+    direccion: { type: String, required: true, trim: true },
 
-    telefono: {
-      type: String,
-      required: true,
-      match: /^\d{10}$/ // exactamente 10 dígitos
-    },
+    // opcionales (si quieres dejarlos)
+    correo: { type: String, trim: true, lowercase: true },
+    telefono: { type: String, trim: true, match: /^\d{10}$/ },
 
-    correo: {
-      type: String,
-      trim: true,
-      lowercase: true
-    },
+    alergias: { type: String, default: "Ninguna", trim: true },
+    observaciones: { type: String, trim: true },
 
-    peso: Number,
-    altura: Number,
+    medico: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
 
-    medico: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Usuario',
-      required: true
-    },
+    responsable: { type: responsableSchema, required: true },
 
-    familiares: [
-      { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }
-    ]
+    familiares: [{ type: mongoose.Schema.Types.ObjectId, ref: "Usuario" }],
   },
   { timestamps: true }
 );
 
-module.exports =
-  mongoose.models.Paciente ||
-  mongoose.model('Paciente', pacienteSchema);
+module.exports = mongoose.models.Paciente || mongoose.model("Paciente", pacienteSchema);

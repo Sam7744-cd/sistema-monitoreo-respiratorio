@@ -1,70 +1,56 @@
-// -------------------------------------------------------------
-// pacienteRoutes.js - Versión corregida y 100% funcional
-// -------------------------------------------------------------
-
-const express = require('express');
-
-// Importo TODOS los controladores necesarios
+const express = require("express");
 const {
   crearPaciente,
-  registrarConFamiliar,
   obtenerPacientes,
   obtenerPaciente,
+  listarAsociaciones,
   agregarFamiliar,
-  obtenerResumenPaciente,
-  asociarPorCedula   
-} = require('../controllers/pacienteController');
+  quitarFamiliar,
+  actualizarPaciente,
+  eliminarPaciente,
+} = require("../controllers/pacienteController");
 
-const authMiddleware = require('../middleware/auth');
-const roleMiddleware = require('../middleware/roles');
-const Paciente = require("../models/Paciente");
-const { actualizarPaciente } = require('../controllers/pacienteController');
+const authMiddleware = require("../middleware/auth");
+const roleMiddleware = require("../middleware/roles");
 
 const router = express.Router();
 
-// Todas las rutas requieren autenticación
 router.use(authMiddleware);
 
+// Crear paciente
+router.post("/", roleMiddleware(["medico", "admin"]), crearPaciente);
 
-// Registrar paciente SOLO 
-router.post('/', roleMiddleware(['medico', 'admin']), crearPaciente);
-
-
-// Registrar paciente + familiar (este lo agg recien)
-router.post(
-  "/registrar-con-familiar",
+//  asociaciones primero
+router.get(
+  "/asociaciones",
   roleMiddleware(["medico", "admin"]),
-  registrarConFamiliar
+  listarAsociaciones
 );
 
-
-// Obtener todos los pacientes del usuario logueado
-router.get('/', roleMiddleware(['medico', 'familiar', 'admin']), obtenerPacientes);
-
-
-// Obtener un paciente por ID
-router.get('/:id', roleMiddleware(['medico', 'familiar', 'admin']), obtenerPaciente);
-
-
-// Asociar familiar manualmente por ID
-router.post('/:pacienteId/familiares', roleMiddleware(['medico', 'admin']), agregarFamiliar);
-
-
-// Resumen del paciente
-router.get('/:id/resumen', roleMiddleware(['medico', 'familiar', 'admin']), obtenerResumenPaciente);
-
-// Asociar familiar a paciente usando CÉDULAS
+// Asociar familiar
 router.post(
-  "/asociar-cedula",
+  "/:pacienteId/familiares",
   roleMiddleware(["medico", "admin"]),
-  asociarPorCedula   // ← AHORA SÍ EXISTE Y FUNCIONA
+  agregarFamiliar
 );
+
+// Desvincular familiar
+router.delete(
+  "/:pacienteId/familiares/:familiarId",
+  roleMiddleware(["medico", "admin"]),
+  quitarFamiliar
+);
+
+// Listar pacientes
+router.get("/", roleMiddleware(["medico", "familiar", "admin"]), obtenerPacientes);
+
+//  esta SIEMPRE abajo de /asociaciones
+router.get("/:id", roleMiddleware(["medico", "familiar", "admin"]), obtenerPaciente);
 
 // Actualizar paciente
-router.put(
-  "/:id",
-  roleMiddleware(["medico", "admin"]),
-  actualizarPaciente
-);
+router.put("/:id", roleMiddleware(["medico", "admin"]), actualizarPaciente);
+
+// Eliminar paciente
+router.delete("/:id", roleMiddleware(["medico", "admin"]), eliminarPaciente);
 
 module.exports = router;

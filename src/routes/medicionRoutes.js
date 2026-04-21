@@ -1,26 +1,33 @@
-//enrutador para manejar las rutas de mediciones
-const express = require('express');
+//mediciones routes 
+const express = require("express");
+const multer = require("multer");
+
 const {
   crearMedicion,
   obtenerHistorial,
-  obtenerEstadisticas
-} = require('../controllers/medicionController');
+  obtenerEstadisticas,
+  obtenerResumen,
+  clasificarYGuardar,
+  iotAudio,
+} = require("../controllers/medicionController");
 
-//Middleware de autenticación para proteger las rutas
-const authMiddleware = require('../middleware/auth');
+const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Todas las rutas de esta sección requieren que el usuario esté autenticado
+// Rutas protegidas para app / Postman con login
 router.use(authMiddleware);
 
-// Ruta para registrar una nueva medición desde el dispositivo o la app
-router.post('/', crearMedicion);
+router.post("/", crearMedicion);
+router.post("/clasificar-y-guardar", upload.single("file"), clasificarYGuardar);
 
-// Ruta para obtener el historial completo de mediciones de un paciente
-router.get('/paciente/:pacienteId/historial', obtenerHistorial);
+router.get("/paciente/:pacienteId/resumen", obtenerResumen);
+router.get("/paciente/:pacienteId/historial", obtenerHistorial);
+router.get("/paciente/:pacienteId/estadisticas", obtenerEstadisticas);
 
-// Ruta para obtener estadísticas de un paciente (por ejemplo, promedios)
-router.get('/paciente/:pacienteId/estadisticas', obtenerEstadisticas);
+// Ruta especial para IoT
+// Por ahora la dejamos aquí protegida con token
+router.post("/iot-audio", upload.single("file"), iotAudio);
 
 module.exports = router;

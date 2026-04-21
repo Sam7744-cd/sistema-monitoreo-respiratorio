@@ -1,124 +1,153 @@
-const Usuario = require('../models/Usuario');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const Usuario = require("../models/Usuario");
+const Paciente = require("../models/Paciente");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 // Registro de usuario
 const registrar = async (req, res) => {
   try {
-    const { nombre, email, password, rol, telefono, especialidad } = req.body;
+    const { nombre, email, password, telefono, cedula, parentesco } = req.body;
 
-    console.log('Intentando registrar usuario:', email); // Para debug
-
-    // Verificar si el usuario ya existe
     const usuarioExistente = await Usuario.findOne({ email });
     if (usuarioExistente) {
-      return res.status(400).json({
-        error: 'El usuario ya existe'
-      });
+      return res.status(400).json({ error: "El usuario ya existe" });
     }
 
-    // Hashear contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear nuevo usuario
     const usuario = new Usuario({
       nombre,
       email,
       password: hashedPassword,
-      rol,
+      rol: "familiar",
       telefono,
-      especialidad
+      cedula,
+      parentesco,
     });
 
     await usuario.save();
 
-    // Generar token JWT
+    const match = [];
+    if (usuario.cedula) match.push({ "responsable.cedula": usuario.cedula });
+    if (usuario.email) match.push({ "responsable.correo": usuario.email });
+
+    if (match.length > 0) {
+      const pacientes = await Paciente.find({ $or: match });
+
+      if (pacientes.length > 0) {
+        const ids = pacientes.map((p) => p._id);
+
+        await Usuario.findByIdAndUpdate(usuario._id, {
+          $addToSet: { pacientes: { $each: ids } },
+        });
+
+        await Paciente.updateMany(
+          { _id: { $in: ids } },
+          { $addToSet: { familiares: usuario._id } }
+        );
+      }
+    }
+
     const token = jwt.sign(
       { id: usuario._id, rol: usuario.rol },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" }
     );
 
     res.status(201).json({
-      mensaje: 'Usuario registrado exitosamente',
+      mensaje: "Usuario registrado exitosamente",
       token,
       usuario: {
         id: usuario._id,
         nombre: usuario.nombre,
         email: usuario.email,
-        rol: usuario.rol
-      }
+        rol: usuario.rol,
+        telefono: usuario.telefono,
+      },
     });
   } catch (error) {
-    console.error('Error en registro:', error); // Para debug
-    res.status(500).json({
-      error: 'Error en el servidor: ' + error.message
-    });
+    res.status(500).json({ error: "Error en el servidor: " + error.message });
   }
 };
 
-// Login de usuario
+// Login
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Verificar si el usuario existe
     const usuario = await Usuario.findOne({ email });
-    if (!usuario) {
-      return res.status(400).json({
-        error: 'Credenciales inválidas'
-      });
+    if (!usuario) return res.status(400).json({ error: "Credenciales inválidas" });
+
+    if (usuario.activo === false) {
+      return res.status(403).json({ error: "Usuario inactivo" });
     }
 
-    // Verificar contraseña
     const contrasenaValida = await bcrypt.compare(password, usuario.password);
-    if (!contrasenaValida) {
-      return res.status(400).json({
-        error: 'Credenciales inválidas'
-      });
-    }
+    if (!contrasenaValida) return res.status(400).json({ error: "Credenciales inválidas" });
 
-    // Generar token JWT
+    usuario.ultimoAcceso = new Date();
+    await usuario.save();
+
     const token = jwt.sign(
       { id: usuario._id, rol: usuario.rol },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" }
     );
 
     res.json({
-      mensaje: 'Login exitoso',
+      mensaje: "Login exitoso",
       token,
       usuario: {
         id: usuario._id,
         nombre: usuario.nombre,
         email: usuario.email,
-        rol: usuario.rol
-      }
+        rol: usuario.rol,
+        telefono: usuario.telefono,
+      },
     });
   } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({
-      error: 'Error en el servidor: ' + error.message
-    });
+    res.status(500).json({ error: "Error en el servidor: " + error.message });
   }
 };
 
-
-// =============================
-// ACTUALIZAR PERFIL
-// =============================
-const actualizarPerfil = async (req, res) => {
+// OBTENER PERFIL REAL
+const obtenerPerfil = async (req, res) => {
   try {
     const userId = req.usuario.id;
 
-    const { nombre, telefono } = req.body;
+    const usuario = await Usuario.findById(userId).select(
+      "nombre email rol telefono cedula parentesco"
+    );
 
-    const usuario = await Usuario.findById(userId);
     if (!usuario) {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
-    usuario.nombre = nombre ?? usuario.nombre;
+    res.json({
+      usuario: {
+        id: usuario._id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        telefono: usuario.telefono,
+        cedula: usuario.cedula,
+        parentesco: usuario.parentesco,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ACTUALIZAR PERFIL
+const actualizarPerfil = async (req, res) => {
+  try {
+    const userId = req.usuario.id;
+    const { telefono } = req.body;
+
+    const usuario = await Usuario.findById(userId);
+    if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
+
     usuario.telefono = telefono ?? usuario.telefono;
 
     await usuario.save();
@@ -130,16 +159,13 @@ const actualizarPerfil = async (req, res) => {
         nombre: usuario.nombre,
         email: usuario.email,
         rol: usuario.rol,
-        telefono: usuario.telefono
-      }
+        telefono: usuario.telefono,
+      },
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
-
 
 // CAMBIAR CONTRASEÑA
 const cambiarPassword = async (req, res) => {
@@ -148,14 +174,10 @@ const cambiarPassword = async (req, res) => {
     const { passwordActual, nuevaPassword } = req.body;
 
     const usuario = await Usuario.findById(userId);
-    if (!usuario) {
-      return res.status(404).json({ error: "Usuario no encontrado" });
-    }
+    if (!usuario) return res.status(404).json({ error: "Usuario no encontrado" });
 
     const coincide = await bcrypt.compare(passwordActual, usuario.password);
-    if (!coincide) {
-      return res.status(400).json({ error: "Contraseña actual incorrecta" });
-    }
+    if (!coincide) return res.status(400).json({ error: "Contraseña actual incorrecta" });
 
     const hashed = await bcrypt.hash(nuevaPassword, 10);
     usuario.password = hashed;
@@ -163,16 +185,15 @@ const cambiarPassword = async (req, res) => {
     await usuario.save();
 
     res.json({ mensaje: "Contraseña actualizada correctamente" });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-
 module.exports = {
   registrar,
   login,
+  obtenerPerfil,
   actualizarPerfil,
-  cambiarPassword
+  cambiarPassword,
 };

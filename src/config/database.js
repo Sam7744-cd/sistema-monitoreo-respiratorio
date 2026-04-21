@@ -1,4 +1,3 @@
-// Importación de la librería Mongoose para manejar la conexión a MongoDB
 const mongoose = require('mongoose');
 
 // Función asíncrona que establece la conexión con MongoDB usando la URI del archivo .env

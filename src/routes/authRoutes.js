@@ -1,36 +1,22 @@
-// Rutas relacionadas con autenticación de usuarios (registro, login, perfil)
-
-const express = require('express');
+const express = require("express");
 
 const {
   registrar,
   login,
+  obtenerPerfil,
   actualizarPerfil,
-  cambiarPassword
-} = require('../controllers/authController');
+  cambiarPassword,
+} = require("../controllers/authController");
 
-const authMiddleware = require('../middleware/auth');
+const authMiddleware = require("../middleware/auth");
 
 const router = express.Router();
 
-// Registro de usuario
-router.post('/registrar', registrar);
+router.post("/registrar", registrar);
+router.post("/login", login);
 
-// Login
-router.post('/login', login);
-
-// Ver perfil (protegida)
-router.get('/perfil', authMiddleware, (req, res) => {
-  res.json({
-    mensaje: 'Perfil del usuario',
-    usuario: req.usuario
-  });
-});
-
-// Actualizar perfil
-router.put('/perfil', authMiddleware, actualizarPerfil);
-
-// Cambiar contraseña
-router.put('/cambiar-password', authMiddleware, cambiarPassword);
+router.get("/perfil", authMiddleware, obtenerPerfil);
+router.put("/perfil", authMiddleware, actualizarPerfil);
+router.put("/cambiar-password", authMiddleware, cambiarPassword);
 
 module.exports = router;

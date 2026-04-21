@@ -1,171 +1,106 @@
-// pacienteController.js 
-const Paciente = require('../models/Paciente');
-const Usuario = require('../models/Usuario');
-const Medicion = require('../models/medicion');
-const Alerta = require('../models/Alerta');
-const Reporte = require('../models/Reporte');
-const bcrypt = require("bcryptjs");
+const Paciente = require("../models/Paciente");
+const Usuario = require("../models/Usuario");
 
+// ===== helper: calcular edad (años) desde fechaNacimiento =====
+function calcEdadAnios(fechaNacimiento) {
+  if (!fechaNacimiento) return 0;
+  const n = new Date(fechaNacimiento);
+  if (isNaN(n.getTime())) return 0;
+
+  const hoy = new Date();
+  let anios = hoy.getFullYear() - n.getFullYear();
+  const m = hoy.getMonth() - n.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < n.getDate())) anios--;
+  if (anios < 0) anios = 0;
+  return anios;
+}
+
+// =====================
+// CREAR PACIENTE (acepta formato NUEVO y VIEJO)
+// =====================
 const crearPaciente = async (req, res) => {
   try {
     const medicoId = req.usuario.id;
-    const { cedula } = req.body;
 
-    //  evitar duplicados por cédula
-    const existe = await Paciente.findOne({ cedula });
+    // ------ FORMATO NUEVO (PWA bonita) ------
+    const {
+      nombres,
+      apellidos,
+      fechaNacimiento,
+      responsable, // { nombre, cedula, telefono, correo, parentesco }
+    } = req.body;
+
+    // ------ FORMATO VIEJO (simple) ------
+    const { nombre, cedula, edad, sexo, direccion, telefono, correo } = req.body;
+
+    // Cedula: puede venir como cedula del paciente
+    const cedulaPaciente = String(cedula || req.body?.cedula || "").trim();
+
+    // Nombre: puede venir (nombres+apellidos) o (nombre)
+    const nombrePaciente =
+      (String(nombres || "").trim() + " " + String(apellidos || "").trim()).trim() ||
+      String(nombre || "").trim();
+
+    // Sexo / dirección: pueden venir en ambos formatos
+    const sexoPaciente = sexo || req.body?.sexo || "Femenino";
+    const direccionPaciente = req.body?.direccion || "";
+
+    // Validación mínima real
+    if (!nombrePaciente || !cedulaPaciente) {
+      return res
+        .status(400)
+        .json({ error: "Faltan campos obligatorios (nombre/nombres-apellidos, cédula)" });
+    }
+
+    // evitar duplicados por cédula
+    const existe = await Paciente.findOne({ cedula: cedulaPaciente });
     if (existe) {
-      return res.status(400).json({
-        error: "Ya existe un paciente registrado con esta cédula"
-      });
+      return res.status(400).json({ error: "Ya existe un paciente con esa cédula" });
     }
 
-    const paciente = new Paciente({
-      ...req.body,
+    // Edad: si viene fechaNacimiento úsala, si no usa edad numérica
+    const edadFinal = fechaNacimiento ? calcEdadAnios(fechaNacimiento) : Number(edad || 0);
+
+    // Telefono/correo: si vienen en formato nuevo están en responsable
+    const telFinal = responsable?.telefono || telefono || "";
+    const correoFinal = responsable?.correo || correo || "";
+
+    // Guardar
+    const nuevo = new Paciente({
+      // compatibilidad con tu schema actual:
+      nombre: nombrePaciente,
+      cedula: cedulaPaciente,
+      edad: edadFinal,
+      sexo: sexoPaciente,
+      direccion: direccionPaciente,
+      telefono: telFinal,
+      correo: correoFinal,
+
+      // si tu schema tiene estos campos, se guardan; si no, Mongo igual los guarda:
+      nombres: nombres || undefined,
+      apellidos: apellidos || undefined,
+      fechaNacimiento: fechaNacimiento || undefined,
+      responsable: responsable || undefined,
+
       medico: medicoId,
-      familiares: []
+      familiares: [],
     });
 
-    await paciente.save();
+    await nuevo.save();
 
     await Usuario.findByIdAndUpdate(medicoId, {
-      $addToSet: { pacientes: paciente._id }
+      $addToSet: { pacientes: nuevo._id },
     });
 
-    res.status(201).json({
-      mensaje: "Paciente creado exitosamente",
-      paciente
-    });
+    res.status(201).json({ mensaje: "Paciente creado exitosamente", paciente: nuevo });
   } catch (error) {
-    res.status(400).json({
-      error: error.message
-    });
+    res.status(500).json({ error: "Error creando paciente: " + error.message });
   }
 };
 
-
-// REGISTRAR PACIENTE + FAMILIAR 
-const registrarConFamiliar = async (req, res) => {
-  try {
-    const medicoId = req.usuario.id;
-    const { paciente, familiar } = req.body;
-
-    if (!paciente || !familiar) {
-      return res.status(400).json({ error: "Datos incompletos" });
-    }
-
-    // 1️ Buscar familiar por correo o cédula
-    let familiarUsuario = await Usuario.findOne({
-      $or: [
-        { email: familiar.correo },
-        { cedula: familiar.cedula }
-      ]
-    });
-
-    // 2️ Si NO existe - CREARLO
-    if (!familiarUsuario) {
-      familiarUsuario = new Usuario({
-        nombre: familiar.nombre,
-        email: familiar.correo,
-        password: await bcrypt.hash(familiar.cedula + "123", 10),
-        rol: "familiar",
-        telefono: familiar.telefono,
-        cedula: familiar.cedula,
-        parentesco: familiar.parentesco,
-      });
-
-      await familiarUsuario.save();
-    }
-
-    // 3️ Si YA EXISTE - ACTUALIZAR DATOS
-    else {
-      // actualizar si vienen datos nuevos
-      familiarUsuario.nombre = familiar.nombre || familiarUsuario.nombre;
-      familiarUsuario.email = familiar.correo || familiarUsuario.email;
-      familiarUsuario.telefono = familiar.telefono || familiarUsuario.telefono;
-      familiarUsuario.parentesco = familiar.parentesco || familiarUsuario.parentesco;
-
-      //  ACTUALIZAR CÉDULA
-      if (familiar.cedula && familiar.cedula.length === 10) {
-        familiarUsuario.cedula = familiar.cedula;
-      }
-
-      await familiarUsuario.save();
-    }
-
-    // 4️ Crear paciente
-    const nuevoPaciente = new Paciente({
-      ...paciente,
-      medico: medicoId,
-      familiares: [familiarUsuario._id]
-    });
-
-    await nuevoPaciente.save();
-
-    // 5️ Asociar paciente al familiar
-    if (!familiarUsuario.pacientes.includes(nuevoPaciente._id)) {
-      familiarUsuario.pacientes.push(nuevoPaciente._id);
-      await familiarUsuario.save();
-    }
-
-    // 6️ Asociar paciente al médico
-    await Usuario.findByIdAndUpdate(medicoId, {
-      $addToSet: { pacientes: nuevoPaciente._id }
-    });
-
-    res.status(201).json({
-      mensaje: "Paciente y familiar registrados correctamente",
-      paciente: nuevoPaciente,
-      familiar: familiarUsuario
-    });
-
-  } catch (error) {
-    console.error("ERROR registrarConFamiliar:", error);
-    res.status(500).json({
-      error: "Error en el servidor: " + error.message
-    });
-  }
-};
-
-
-// -------------------------------------------------------------
-// ASOCIAR FAMILIAR A PACIENTE POR CÉDULA
-// -------------------------------------------------------------
-const asociarPorCedula = async (req, res) => {
-  try {
-    const { cedulaPaciente, cedulaFamiliar } = req.body;
-
-    if (!cedulaPaciente || !cedulaFamiliar) {
-      return res.status(400).json({ error: "Faltan cédulas" });
-    }
-
-    const paciente = await Paciente.findOne({ cedula: cedulaPaciente });
-    if (!paciente) return res.status(404).json({ error: "Paciente no encontrado" });
-
-    const familiar = await Usuario.findOne({ cedula: cedulaFamiliar, rol: "familiar" });
-    if (!familiar) return res.status(404).json({ error: "Familiar no encontrado" });
-
-    // Asociar ambos lados
-    if (!paciente.familiares.includes(familiar._id)) {
-      paciente.familiares.push(familiar._id);
-    }
-
-    if (!familiar.pacientes.includes(paciente._id)) {
-      familiar.pacientes.push(paciente._id);
-    }
-
-    await paciente.save();
-    await familiar.save();
-
-    res.json({ mensaje: "Asociación realizada con éxito", paciente, familiar });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error en servidor" });
-  }
-};
-
-
-// -------------------------------------------------------------
+// =====================
+// OBTENER PACIENTES SEGÚN ROL
+// =====================
 const obtenerPacientes = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -174,142 +109,276 @@ const obtenerPacientes = async (req, res) => {
     let pacientes = [];
 
     if (rol === "medico") {
-      pacientes = await Paciente.find({ medico: usuarioId });
+      pacientes = await Paciente.find({ medico: usuarioId }).sort({ createdAt: -1 });
     } else if (rol === "familiar") {
-      pacientes = await Paciente.find({ familiares: usuarioId });
+      pacientes = await Paciente.find({ familiares: usuarioId }).sort({ createdAt: -1 });
+    } else {
+      pacientes = await Paciente.find({}).sort({ createdAt: -1 });
     }
 
     res.json(pacientes);
   } catch (error) {
-    console.error("ERROR obtenerPacientes:", error);
-    res.status(500).json({ error: "Error al obtener pacientes" });
+    res.status(500).json({ error: "Error al obtener pacientes: " + error.message });
   }
 };
 
-
-// -------------------------------------------------------------
+// =====================
+// OBTENER PACIENTE POR ID
+// =====================
 const obtenerPaciente = async (req, res) => {
   try {
     const paciente = await Paciente.findById(req.params.id)
       .populate("medico", "nombre email")
-      .populate("familiares", "nombre email telefono cedula parentesco"); // 🔥 agregué cedula
+      .populate("familiares", "nombre email telefono cedula parentesco");
 
-    if (!paciente)
-      return res.status(404).json({ error: "Paciente no encontrado" });
+    if (!paciente) return res.status(404).json({ error: "Paciente no encontrado" });
 
     res.json({ paciente });
   } catch (error) {
-    res.status(500).json({ error: "Error obteniendo paciente" });
+    res.status(500).json({ error: "Error obteniendo paciente: " + error.message });
   }
 };
 
+// =====================
+// LISTAR ASOCIACIONES (para la tabla de arriba)
+// GET /api/pacientes/asociaciones
+// =====================
+const listarAsociaciones = async (req, res) => {
+  try {
+    const medicoId = req.usuario.id;
 
-// -------------------------------------------------------------
+    const pacientes = await Paciente.find({ medico: medicoId })
+      .select("nombre nombres apellidos cedula edad sexo fechaNacimiento responsable familiares")
+      .populate("familiares", "nombre cedula parentesco telefono email");
+
+    const filas = [];
+
+    for (const p of pacientes) {
+      const pNombre =
+        (p.nombres || p.apellidos)
+          ? `${p.nombres || ""} ${p.apellidos || ""}`.trim()
+          : p.nombre || "Paciente";
+
+      // 1) familiares realmente asociados
+      if (Array.isArray(p.familiares) && p.familiares.length > 0) {
+        for (const f of p.familiares) {
+          filas.push({
+            pacienteId: p._id,
+            pacienteNombre: pNombre,
+            pacienteCedula: p.cedula || "",
+            familiarId: f._id,
+            familiarNombre: f.nombre || "",
+            familiarCedula: f.cedula || "",
+            parentesco: f.parentesco || "Familiar",
+            telefono: f.telefono || "",
+            tipo: "asociado",
+          });
+        }
+      }
+
+      // 2) si no hay familiar asociado, pero sí responsable guardado
+      if ((!p.familiares || p.familiares.length === 0) && p.responsable?.nombre) {
+        filas.push({
+          pacienteId: p._id,
+          pacienteNombre: pNombre,
+          pacienteCedula: p.cedula || "",
+          familiarId: null,
+          familiarNombre: p.responsable.nombre || "",
+          familiarCedula: p.responsable.cedula || "",
+          parentesco: p.responsable.parentesco || "Responsable",
+          telefono: p.responsable.telefono || "",
+          tipo: "responsable",
+        });
+      }
+    }
+
+    res.json(filas);
+  } catch (e) {
+    res.status(500).json({ error: "Error listando asociaciones: " + e.message });
+  }
+};
+
+// =====================
+// ASOCIAR FAMILIAR (por ID)
+// POST /api/pacientes/:pacienteId/familiares { familiarId }
+// =====================
 const agregarFamiliar = async (req, res) => {
   try {
     const { pacienteId } = req.params;
     const { familiarId } = req.body;
 
+    if (!familiarId) {
+      return res.status(400).json({ error: "familiarId es obligatorio" });
+    }
+
     const paciente = await Paciente.findById(pacienteId);
-    if (!paciente)
+    if (!paciente) {
       return res.status(404).json({ error: "Paciente no encontrado" });
+    }
 
     const familiar = await Usuario.findById(familiarId);
-    if (!familiar || familiar.rol !== "familiar")
-      return res.status(400).json({ error: 'Debe ser un usuario rol "familiar"' });
-
-    if (!paciente.familiares.includes(familiarId)) {
-      paciente.familiares.push(familiarId);
-      await paciente.save();
+    if (!familiar || familiar.rol !== "familiar") {
+      return res.status(400).json({ error: 'Debe ser un usuario con rol "familiar"' });
     }
 
-    if (!familiar.pacientes.includes(pacienteId)) {
-      familiar.pacientes.push(pacienteId);
-      await familiar.save();
-    }
+    await Paciente.findByIdAndUpdate(
+      pacienteId,
+      { $addToSet: { familiares: familiarId } },
+      { new: true }
+    );
 
-    res.json({ mensaje: "Familiar agregado", paciente });
+    await Usuario.findByIdAndUpdate(
+      familiarId,
+      { $addToSet: { pacientes: pacienteId } },
+      { new: true }
+    );
+
+    res.json({ mensaje: "Familiar asociado correctamente" });
   } catch (error) {
-    res.status(500).json({ error: "Error agregando familiar" });
+    res.status(500).json({ error: "Error asociando familiar: " + error.message });
   }
 };
 
-
-// -------------------------------------------------------------
-const obtenerResumenPaciente = async (req, res) => {
+// DESVINCULAR FAMILIAR
+// DELETE /api/pacientes/:pacienteId/familiares/:familiarId
+const quitarFamiliar = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { pacienteId, familiarId } = req.params;
 
-    const paciente = await Paciente.findById(id)
-      .populate("familiares", "nombre cedula parentesco telefono"); // 🔥 extra
-
-    if (!paciente)
+    const paciente = await Paciente.findById(pacienteId);
+    if (!paciente) {
       return res.status(404).json({ error: "Paciente no encontrado" });
+    }
 
-    const ultimaMedicion = await Medicion.findOne({ paciente: id })
-      .sort({ fechaHora: -1 });
+    const familiar = await Usuario.findById(familiarId);
+    if (!familiar) {
+      return res.status(404).json({ error: "Familiar no encontrado" });
+    }
 
-    const alertasPendientes = await Alerta.find({ paciente: id, leido: false })
-      .sort({ fecha: -1 });
+    //  quitar sin disparar validación completa del schema
+    await Paciente.findByIdAndUpdate(
+      pacienteId,
+      { $pull: { familiares: familiarId } },
+      { new: true }
+    );
 
-    const reportesRecientes = await Reporte.find({ paciente: id })
-      .sort({ fecha: -1 })
-      .limit(3);
+    await Usuario.findByIdAndUpdate(
+      familiarId,
+      { $pull: { pacientes: pacienteId } },
+      { new: true }
+    );
 
-    res.json({
-      paciente,
-      ultimaMedicion,
-      alertasPendientes,
-      reportesRecientes
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Error obteniendo resumen" });
+    res.json({ mensaje: "Familiar desvinculado correctamente" });
+  } catch (e) {
+    res.status(500).json({ error: "Error desvinculando: " + e.message });
   }
 };
 
-// -------------------------------------------------------------
-// ACTUALIZAR PACIENTE
-// -------------------------------------------------------------
+// ACTUALIZAR PACIENTE 
 const actualizarPaciente = async (req, res) => {
   try {
     const { id } = req.params;
 
     const paciente = await Paciente.findById(id);
-    if (!paciente) {
-      return res.status(404).json({ error: "Paciente no encontrado" });
+    if (!paciente) return res.status(404).json({ error: "Paciente no encontrado" });
+
+    // compat + nuevo
+    if (req.body.nombres !== undefined) paciente.nombres = req.body.nombres;
+    if (req.body.apellidos !== undefined) paciente.apellidos = req.body.apellidos;
+
+    if (req.body.nombre !== undefined) paciente.nombre = req.body.nombre;
+    if (req.body.cedula !== undefined) paciente.cedula = req.body.cedula;
+
+    if (req.body.fechaNacimiento !== undefined) {
+      paciente.fechaNacimiento = req.body.fechaNacimiento ? new Date(req.body.fechaNacimiento) : undefined;
+      paciente.edad = req.body.fechaNacimiento ? calcEdadAnios(req.body.fechaNacimiento) : paciente.edad;
     }
 
-    // actualizar campos permitidos
-    paciente.nombre = req.body.nombre ?? paciente.nombre;
-    paciente.edad = req.body.edad ?? paciente.edad;
-    paciente.sexo = req.body.sexo ?? paciente.sexo;
-    paciente.telefono = req.body.telefono ?? paciente.telefono;
-    paciente.direccion = req.body.direccion ?? paciente.direccion;
-    paciente.correo = req.body.correo ?? paciente.correo;
+    if (req.body.edad !== undefined) paciente.edad = req.body.edad;
+    if (req.body.sexo !== undefined) paciente.sexo = req.body.sexo;
+    if (req.body.direccion !== undefined) paciente.direccion = req.body.direccion;
+    if (req.body.telefono !== undefined) paciente.telefono = req.body.telefono;
+    if (req.body.correo !== undefined) paciente.correo = req.body.correo;
+
+    if (req.body.alergias !== undefined) paciente.alergias = req.body.alergias;
+    if (req.body.observaciones !== undefined) paciente.observaciones = req.body.observaciones;
+
+    if (req.body.responsable !== undefined) paciente.responsable = req.body.responsable;
 
     await paciente.save();
 
-    res.json({
-      mensaje: "Paciente actualizado correctamente",
-      paciente
-    });
+    res.json({ mensaje: "Paciente actualizado correctamente", paciente });
   } catch (error) {
-    console.error("ERROR actualizarPaciente:", error);
-    res.status(400).json({
-      error: error.message
-    });
+    res.status(400).json({ error: error.message });
   }
 };
 
+// =====================
+// ELIMINAR PACIENTE
+// =====================
+const eliminarPaciente = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-// -------------------------------------------------------------
+    const paciente = await Paciente.findById(id);
+    if (!paciente) return res.status(404).json({ error: "Paciente no encontrado" });
+
+    // quitar del médico
+    if (paciente.medico) {
+      await Usuario.findByIdAndUpdate(paciente.medico, {
+        $pull: { pacientes: paciente._id },
+      });
+    }
+
+    // quitar de familiares asociados
+    if (paciente.familiares && paciente.familiares.length > 0) {
+      await Usuario.updateMany(
+        { _id: { $in: paciente.familiares } },
+        { $pull: { pacientes: paciente._id } }
+      );
+    }
+
+    await Paciente.findByIdAndDelete(id);
+
+    res.json({ mensaje: "Paciente eliminado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: "Error eliminando paciente: " + error.message });
+  }
+};
+
+// DELETE /api/pacientes/:pacienteId/familiares/:familiarId
+const desvincularFamiliar = async (req, res) => {
+  try {
+    const { pacienteId, familiarId } = req.params;
+
+    const paciente = await Paciente.findById(pacienteId);
+    if (!paciente) return res.status(404).json({ error: "Paciente no encontrado" });
+
+    // quitar familiar del paciente
+    paciente.familiares = (paciente.familiares || []).filter(
+      (id) => String(id) !== String(familiarId)
+    );
+    await paciente.save();
+
+    // quitar paciente del familiar
+    await Usuario.findByIdAndUpdate(familiarId, {
+      $pull: { pacientes: paciente._id },
+    });
+
+    res.json({ mensaje: "Asociación eliminada correctamente" });
+  } catch (e) {
+    res.status(500).json({ error: "Error desvinculando: " + e.message });
+  }
+};
+
 module.exports = {
   crearPaciente,
-  registrarConFamiliar,
-  asociarPorCedula,
   obtenerPacientes,
   obtenerPaciente,
+  listarAsociaciones,
+  desvincularFamiliar,
   agregarFamiliar,
-  obtenerResumenPaciente,
-  actualizarPaciente
+  quitarFamiliar,
+  actualizarPaciente,
+  eliminarPaciente,
 };

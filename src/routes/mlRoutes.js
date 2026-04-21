@@ -1,39 +1,43 @@
 const express = require("express");
 const router = express.Router();
-const Medicion = require("../models/medicion");
+const multer = require("multer");
 const axios = require("axios");
+const FormData = require("form-data");
 
-router.post("/predict/:id", async (req, res) => {
+const upload = multer({ storage: multer.memoryStorage() });
+
+const ML_API_URL = process.env.ML_API_URL || "http://127.0.0.1:5001";
+
+// POST /api/ml/predict-audio
+router.post("/predict-audio", upload.single("file"), async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const medicion = await Medicion.findOne({ _identificación: id });
-
-
-    if (!medicion) {
-      return res.status(404).json({ error: "Medición no encontrada" });
+    if (!req.file) {
+      return res.status(400).json({ error: "No se envió ningún archivo WAV" });
     }
 
-    // llamada a Flask
-    const response = await axios.post("http://127.0.0.1:5001/predict", {
-      features: medicion.audio_fft
+    const form = new FormData();
+    form.append("file", req.file.buffer, req.file.originalname);
+
+    const response = await axios.post(
+      `${ML_API_URL}/predict-audio`,
+      form,
+      {
+        headers: form.getHeaders(),
+        maxBodyLength: Infinity,
+      }
+    );
+
+    return res.json({
+      mensaje: "Predicción generada correctamente",
+      prediccion: response.data.prediccion,
+      confianza: response.data.confianza,
     });
-
-    medicion.resultado = {
-      tipo: response.data.prediccion,
-      confianza: response.data.confianza
-    };
-
-    await medicion.save();
-
-    res.json({
-      mensaje: "Diagnóstico actualizado",
-      resultado: medicion.resultado
-    });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error llamando a ML" });
+    console.error("Error en ML:", error.response?.data || error.message);
+    return res.status(500).json({
+      error: "Error llamando a la API de Machine Learning",
+      detalle: error.response?.data || error.message,
+    });
   }
 });
 
