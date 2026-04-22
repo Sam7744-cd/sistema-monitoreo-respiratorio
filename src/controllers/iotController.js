@@ -69,6 +69,7 @@ const getPacienteActivo = async (req, res) => {
 const iotAudio = async (req, res) => {
   try {
     console.log("BODY DESDE ESP32:", req.body);
+    console.log("ML_API_URL usada:", ML_API_URL);
 
     if (!pacienteActivoId) {
       return res.status(400).json({
@@ -108,10 +109,19 @@ const iotAudio = async (req, res) => {
     const form = new FormData();
     form.append("file", req.file.buffer, fileName);
 
-    const response = await axios.post(`${ML_API_URL}/predict-audio`, form, {
-      headers: form.getHeaders(),
-      maxBodyLength: Infinity,
-    });
+    console.log("Enviando audio al ML...");
+
+    const response = await axios.post(
+      `${ML_API_URL}/predict-audio`,
+      form,
+      {
+        headers: form.getHeaders(),
+        maxBodyLength: Infinity,
+        timeout: 60000, // 60 segundos
+      }
+    );
+
+    console.log("Respuesta del ML recibida:", response.data);
 
     const {
       prediccion,
@@ -152,7 +162,10 @@ const iotAudio = async (req, res) => {
       medicion: nuevaMedicion,
     });
   } catch (error) {
-    console.error("Error en iotAudio:", error.response?.data || error.message);
+    console.error("Error en iotAudio:");
+    console.error("Mensaje:", error.message);
+    console.error("Respuesta ML:", error.response?.data);
+    console.error("Status ML:", error.response?.status);
 
     res.status(500).json({
       error: "Error al procesar audio IoT",
