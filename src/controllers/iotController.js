@@ -111,18 +111,14 @@ const iotAudio = async (req, res) => {
 
     console.log("Enviando audio al ML...");
 
-    const response = await axios.post(
-      `${ML_API_URL}/predict-audio`,
-      form,
-      {
-        headers: {
-          ...form.getHeaders(),
-          "ngrok-skip-browser-warning": "true",
-        },
-        maxBodyLength: Infinity,
-        timeout: 120000,
-      }
-    );
+    const response = await axios.post(`${ML_API_URL}/predict-audio`, form, {
+      headers: {
+        ...form.getHeaders(),
+        "ngrok-skip-browser-warning": "true",
+      },
+      maxBodyLength: Infinity,
+      timeout: 120000,
+    });
 
     console.log("Respuesta del ML recibida:", response.data);
 
@@ -177,8 +173,41 @@ const iotAudio = async (req, res) => {
   }
 };
 
+const proxyArchivoML = async (req, res) => {
+  try {
+    const { url } = req.query;
+
+    if (!url) {
+      return res.status(400).json({ error: "Falta la URL del archivo" });
+    }
+
+    const response = await axios.get(url, {
+      responseType: "arraybuffer",
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+      timeout: 120000,
+    });
+
+    res.setHeader(
+      "Content-Type",
+      response.headers["content-type"] || "application/octet-stream"
+    );
+
+    res.send(response.data);
+  } catch (error) {
+    console.error("Error proxyArchivoML:", error.message);
+
+    res.status(500).json({
+      error: "No se pudo cargar el archivo del ML",
+      detalle: error.message,
+    });
+  }
+};
+
 module.exports = {
   setPacienteActivo,
   getPacienteActivo,
   iotAudio,
+  proxyArchivoML,
 };
