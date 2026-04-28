@@ -13,6 +13,7 @@ app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE", "PATCH"] }
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
+    contentSecurityPolicy: false,
   })
 );
 

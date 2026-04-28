@@ -175,11 +175,24 @@ const iotAudio = async (req, res) => {
 
 const proxyArchivoML = async (req, res) => {
   try {
-    const { url } = req.query;
+    let { url } = req.query;
 
     if (!url) {
       return res.status(400).json({ error: "Falta la URL del archivo" });
     }
+
+    url = decodeURIComponent(url);
+
+    // Corrige URLs viejas guardadas en Mongo con localhost
+    if (url.includes("localhost:5001") || url.includes("127.0.0.1:5001")) {
+      url = url
+        .replace("http://localhost:5001", ML_API_URL)
+        .replace("https://localhost:5001", ML_API_URL)
+        .replace("http://127.0.0.1:5001", ML_API_URL)
+        .replace("https://127.0.0.1:5001", ML_API_URL);
+    }
+
+    console.log("Proxy cargando archivo ML:", url);
 
     const response = await axios.get(url, {
       responseType: "arraybuffer",
@@ -189,6 +202,9 @@ const proxyArchivoML = async (req, res) => {
       timeout: 120000,
     });
 
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Cache-Control", "no-store");
     res.setHeader(
       "Content-Type",
       response.headers["content-type"] || "application/octet-stream"
