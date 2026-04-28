@@ -115,9 +115,12 @@ const iotAudio = async (req, res) => {
       `${ML_API_URL}/predict-audio`,
       form,
       {
-        headers: form.getHeaders(),
+        headers: {
+          ...form.getHeaders(),
+          "ngrok-skip-browser-warning": "true",
+        },
         maxBodyLength: Infinity,
-        timeout: 60000, // 60 segundos
+        timeout: 120000,
       }
     );
 
