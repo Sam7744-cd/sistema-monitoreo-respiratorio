@@ -9,10 +9,15 @@ connectDB();
 const app = express();
 
 app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE", "PATCH"] }));
-app.use(helmet());
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+  })
+);
+
 app.use(express.json({ limit: "10mb" }));
 
-// Rutas 
 const authRoutes = require("./routes/authRoutes");
 const pacienteRoutes = require("./routes/pacienteRoutes");
 const medicionRoutes = require("./routes/medicionRoutes");
@@ -29,7 +34,8 @@ app.use("/api/dispositivos", dispositivoRoutes);
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api/ml", mlRoutes);
 app.use("/api/familiares", familiarRoutes);
-app.use("/api/iot", iotRoutes)
+app.use("/api/iot", iotRoutes);
+
 app.get("/api/health", (req, res) => {
   res.json({
     status: "Servidor funcionando",
