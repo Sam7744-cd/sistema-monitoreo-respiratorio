@@ -14,6 +14,38 @@ const MedicionSchema = new mongoose.Schema(
     sibilancias: Number,
     roncus: Number,
 
+    sintomas: {
+      fiebre: {
+        type: Boolean,
+        default: false,
+      },
+
+      tos: {
+        type: Boolean,
+        default: false,
+      },
+
+      retraccion_intercostal: {
+        type: Boolean,
+        default: false,
+      },
+
+      dificultad_respiratoria: {
+        type: Boolean,
+        default: false,
+      },
+
+      saturacion_baja: {
+        type: Boolean,
+        default: false,
+      },
+
+      observaciones_clinicas: {
+        type: String,
+        default: "",
+      },
+    },
+
     resultado: {
       tipo: {
         type: String,
@@ -73,11 +105,32 @@ const MedicionSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    score_riesgo: {
+    type: Number,
+    default: 0,
+  },
+
+    nivel_riesgo: {
+      type: String,
+      default: "bajo",
+    },
+
+    estado_modelo: {
+      type: String,
+      default: "confiable",
+    },
+
+    repetir_captura: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
     collection: "mediciones",
-  }
+  },
+  
 );
 
 module.exports =

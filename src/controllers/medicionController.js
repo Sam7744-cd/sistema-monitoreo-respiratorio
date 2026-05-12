@@ -259,6 +259,7 @@ const clasificarYGuardar = async (req, res) => {
       ruido,
       sibilancias,
       roncus,
+      sintomas,
       acelerometro,
       features,
       timestamp,
@@ -307,6 +308,7 @@ const clasificarYGuardar = async (req, res) => {
       ruido: ruido ? Number(ruido) : undefined,
       sibilancias: sibilancias ? Number(sibilancias) : 0,
       roncus: roncus ? Number(roncus) : 0,
+      sintomas: sintomas || {},
       resultado: {
         tipo: prediccion,
         confianza: confianza,

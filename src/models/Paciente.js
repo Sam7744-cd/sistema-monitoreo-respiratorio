@@ -28,6 +28,12 @@ const pacienteSchema = new mongoose.Schema(
 
     sexo: { type: String, required: true, enum: ["Masculino", "Femenino"] },
 
+    peso: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
     direccion: { type: String, required: true, trim: true },
 
     // opcionales (si quieres dejarlos)
