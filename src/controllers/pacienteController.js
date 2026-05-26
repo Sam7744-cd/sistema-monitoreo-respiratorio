@@ -1,7 +1,7 @@
 const Paciente = require("../models/Paciente");
 const Usuario = require("../models/Usuario");
 
-// ===== helper: calcular edad (años) desde fechaNacimiento =====
+//  helper: calcular edad (años) desde fechaNacimiento
 function calcEdadAnios(fechaNacimiento) {
   if (!fechaNacimiento) return 0;
   const n = new Date(fechaNacimiento);
@@ -15,14 +15,11 @@ function calcEdadAnios(fechaNacimiento) {
   return anios;
 }
 
-// =====================
-// CREAR PACIENTE (acepta formato NUEVO y VIEJO)
-// =====================
+
+// CREAR PACIENTE 
 const crearPaciente = async (req, res) => {
   try {
     const medicoId = req.usuario.id;
-
-    // ------ FORMATO NUEVO (PWA bonita) ------
     const {
       nombres,
       apellidos,
@@ -30,8 +27,7 @@ const crearPaciente = async (req, res) => {
       responsable, // { nombre, cedula, telefono, correo, parentesco }
     } = req.body;
 
-    // ------ FORMATO VIEJO (simple) ------
-    const { nombre, cedula, edad, sexo, direccion, telefono, correo } = req.body;
+    const { nombre, cedula, edad, sexo, peso, direccion, telefono, correo } = req.body;
 
     // Cedula: puede venir como cedula del paciente
     const cedulaPaciente = String(cedula || req.body?.cedula || "").trim();
@@ -72,6 +68,7 @@ const crearPaciente = async (req, res) => {
       cedula: cedulaPaciente,
       edad: edadFinal,
       sexo: sexoPaciente,
+      peso: peso || 0,
       direccion: direccionPaciente,
       telefono: telFinal,
       correo: correoFinal,
@@ -98,9 +95,7 @@ const crearPaciente = async (req, res) => {
   }
 };
 
-// =====================
 // OBTENER PACIENTES SEGÚN ROL
-// =====================
 const obtenerPacientes = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -122,9 +117,7 @@ const obtenerPacientes = async (req, res) => {
   }
 };
 
-// =====================
 // OBTENER PACIENTE POR ID
-// =====================
 const obtenerPaciente = async (req, res) => {
   try {
     const paciente = await Paciente.findById(req.params.id)
@@ -139,10 +132,8 @@ const obtenerPaciente = async (req, res) => {
   }
 };
 
-// =====================
 // LISTAR ASOCIACIONES (para la tabla de arriba)
 // GET /api/pacientes/asociaciones
-// =====================
 const listarAsociaciones = async (req, res) => {
   try {
     const medicoId = req.usuario.id;
@@ -296,6 +287,7 @@ const actualizarPaciente = async (req, res) => {
 
     if (req.body.edad !== undefined) paciente.edad = req.body.edad;
     if (req.body.sexo !== undefined) paciente.sexo = req.body.sexo;
+    if (req.body.peso !== undefined) paciente.peso = req.body.peso;
     if (req.body.direccion !== undefined) paciente.direccion = req.body.direccion;
     if (req.body.telefono !== undefined) paciente.telefono = req.body.telefono;
     if (req.body.correo !== undefined) paciente.correo = req.body.correo;
