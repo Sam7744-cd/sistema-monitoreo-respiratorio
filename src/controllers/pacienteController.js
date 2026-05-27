@@ -1,5 +1,6 @@
 const Paciente = require("../models/Paciente");
 const Usuario = require("../models/Usuario");
+const bcrypt = require("bcryptjs");
 
 //  helper: calcular edad (años) desde fechaNacimiento
 function calcEdadAnios(fechaNacimiento) {
@@ -61,6 +62,39 @@ const crearPaciente = async (req, res) => {
     const telFinal = responsable?.telefono || telefono || "";
     const correoFinal = responsable?.correo || correo || "";
 
+   
+    let familiarCreado = null;
+
+    if (responsable?.nombre && responsable?.cedula) {
+
+      const familiarExistente = await Usuario.findOne({
+        cedula: responsable.cedula,
+      });
+
+      if (familiarExistente) {
+
+        familiarCreado = familiarExistente;
+
+      } else {
+
+        const passwordTemporal = await bcrypt.hash("familia123", 10);
+
+        familiarCreado = new Usuario({
+          nombre: responsable.nombre,
+          email:
+            responsable.correo ||
+            `familiar${responsable.cedula}@gmail.com`,
+          password: passwordTemporal,
+          rol: "familiar",
+          telefono: responsable.telefono || "",
+          cedula: responsable.cedula,
+          parentesco: responsable.parentesco || "Tutor",
+        });
+
+        await familiarCreado.save();
+      }
+    }
+
     // Guardar
     const nuevo = new Paciente({
       // compatibilidad con tu schema actual:
@@ -80,7 +114,7 @@ const crearPaciente = async (req, res) => {
       responsable: responsable || undefined,
 
       medico: medicoId,
-      familiares: [],
+      familiares: familiarCreado ? [familiarCreado._id] : [],
     });
 
     await nuevo.save();
