@@ -253,6 +253,9 @@ const obtenerResumen = async (req, res) => {
 // Clasificar y guardar desde Postman/app
 const clasificarYGuardar = async (req, res) => {
   try {
+    console.log("Paciente:", req.body.pacienteId);
+    console.log("Archivo:", req.file?.originalname);
+    console.log("Tamaño:", req.file?.size);
     const {
       pacienteId,
       frecuencia_respiratoria,
@@ -291,20 +294,33 @@ const clasificarYGuardar = async (req, res) => {
       headers: form.getHeaders(),
       maxBodyLength: Infinity,
     });
+    console.log("RESPUESTA ML:");
+    console.log(response.data);
 
     const {
       prediccion,
       confianza,
+      frecuencia_respiratoria: frecuenciaRespiratoriaML,
+      calidad_rpm,
       audio_url,
       ruta_audio,
       clase_guardada,
+      waveform_url,
+      spectrogram_url,
+      score_riesgo,
+      nivel_riesgo,
+      repetir_captura,
+      estado_modelo,
+      features_resumen,
     } = response.data;
 
     const nuevaMedicion = new Medicion({
       paciente: pacienteId,
-      frecuencia_respiratoria: frecuencia_respiratoria
-        ? Number(frecuencia_respiratoria)
-        : undefined,
+      frecuencia_respiratoria:
+        frecuenciaRespiratoriaML !== undefined &&
+        frecuenciaRespiratoriaML !== null
+          ? Number(frecuenciaRespiratoriaML)
+          : 0,
       ruido: ruido ? Number(ruido) : undefined,
       sibilancias: sibilancias ? Number(sibilancias) : 0,
       roncus: roncus ? Number(roncus) : 0,
@@ -313,11 +329,13 @@ const clasificarYGuardar = async (req, res) => {
         tipo: prediccion,
         confianza: confianza,
       },
-      features: features || undefined,
+      features: features_resumen || features || undefined,
       acelerometro: acelerometro || undefined,
       audio_filename: fileName,
       audio_url: audio_url || null,
       ruta_audio: ruta_audio || null,
+      waveform_url: waveform_url || null,
+      spectrogram_url: spectrogram_url || null,
       clase_guardada: clase_guardada || prediccion || null,
       timestamp: timestamp || new Date(),
     });
@@ -374,21 +392,54 @@ const iotAudio = async (req, res) => {
     const {
       prediccion,
       confianza,
+      frecuencia_respiratoria: frecuenciaRespiratoriaML,
+      ruido,
       audio_url,
       ruta_audio,
       clase_guardada,
+      waveform_url,
+      spectrogram_url,
+      features_resumen,
+      score_riesgo,
+      nivel_riesgo,
+      repetir_captura,
+      estado_modelo,
     } = response.data;
 
     const nuevaMedicion = new Medicion({
       paciente: pacienteId,
+
+      frecuencia_respiratoria:
+        frecuenciaRespiratoriaML !== undefined &&
+        frecuenciaRespiratoriaML !== null
+          ? Number(frecuenciaRespiratoriaML)
+          : 0,
+
+      ruido:
+        ruido !== undefined && ruido !== null
+          ? Number(ruido)
+          : undefined,
+
       resultado: {
         tipo: prediccion,
-        confianza: confianza,
+        confianza: Number(confianza),
       },
+
+      features: features_resumen || undefined,
+
       audio_filename: fileName,
       audio_url: audio_url || null,
       ruta_audio: ruta_audio || null,
-      clase_guardada: clase_guardada || prediccion || null,
+      waveform_url: waveform_url || null,
+      spectrogram_url: spectrogram_url || null,
+
+      clase_guardada:
+        clase_guardada || prediccion || null,
+
+      score_riesgo: Number(score_riesgo || 0),
+      nivel_riesgo: nivel_riesgo || "bajo",
+      repetir_captura: Boolean(repetir_captura),
+      estado_modelo: estado_modelo || "confiable",
     });
 
     await nuevaMedicion.save();
@@ -407,6 +458,32 @@ const iotAudio = async (req, res) => {
   }
 };
 
+// Eliminar medición
+const eliminarMedicion = async (req, res) => {
+  console.log("ID recibido:", req.params.id);
+  try {
+    const { id } = req.params;
+
+    const medicion = await Medicion.findById(id);
+
+    if (!medicion) {
+      return res.status(404).json({
+        error: "Medición no encontrada",
+      });
+    }
+
+    await Medicion.findByIdAndDelete(id);
+
+    res.json({
+      mensaje: "Medición eliminada correctamente",
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Error eliminando medición: " + error.message,
+    });
+  }
+};
+
 module.exports = {
   crearMedicion,
   obtenerHistorial,
@@ -414,4 +491,5 @@ module.exports = {
   obtenerResumen,
   clasificarYGuardar,
   iotAudio,
+  eliminarMedicion,
 };
