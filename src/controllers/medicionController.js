@@ -393,6 +393,7 @@ const iotAudio = async (req, res) => {
       prediccion,
       confianza,
       frecuencia_respiratoria: frecuenciaRespiratoriaML,
+      calidad_rpm,
       ruido,
       audio_url,
       ruta_audio,
@@ -405,6 +406,9 @@ const iotAudio = async (req, res) => {
       repetir_captura,
       estado_modelo,
     } = response.data;
+
+    console.log("RPM recibidas desde ML:", frecuenciaRespiratoriaML);
+    console.log("Calidad RPM:", calidad_rpm);
 
     const nuevaMedicion = new Medicion({
       paciente: pacienteId,
@@ -422,7 +426,7 @@ const iotAudio = async (req, res) => {
 
       resultado: {
         tipo: prediccion,
-        confianza: Number(confianza),
+        confianza: Number(confianza || 0),
       },
 
       features: features_resumen || undefined,
@@ -430,6 +434,7 @@ const iotAudio = async (req, res) => {
       audio_filename: fileName,
       audio_url: audio_url || null,
       ruta_audio: ruta_audio || null,
+
       waveform_url: waveform_url || null,
       spectrogram_url: spectrogram_url || null,
 
@@ -438,8 +443,11 @@ const iotAudio = async (req, res) => {
 
       score_riesgo: Number(score_riesgo || 0),
       nivel_riesgo: nivel_riesgo || "bajo",
+
       repetir_captura: Boolean(repetir_captura),
-      estado_modelo: estado_modelo || "confiable",
+
+      estado_modelo:
+        estado_modelo || "confiable",
     });
 
     await nuevaMedicion.save();
