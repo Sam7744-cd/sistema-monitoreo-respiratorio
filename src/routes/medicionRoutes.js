@@ -9,6 +9,7 @@ const {
   obtenerResumen,
   clasificarYGuardar,
   iotAudio,
+  actualizarMedicion,
   eliminarMedicion,
 } = require("../controllers/medicionController");
 
@@ -30,6 +31,7 @@ router.get("/paciente/:pacienteId/estadisticas", obtenerEstadisticas);
 // Ruta especial para IoT
 // Por ahora la dejamos aquí protegida con token
 router.post("/iot-audio", upload.single("file"), iotAudio);
+router.put("/:id", actualizarMedicion);
 router.delete("/:id", eliminarMedicion);
 
 module.exports = router;

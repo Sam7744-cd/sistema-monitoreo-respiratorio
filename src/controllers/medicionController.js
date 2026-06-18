@@ -465,7 +465,88 @@ const iotAudio = async (req, res) => {
     });
   }
 };
+// Actualizar datos manuales de una medición
+const actualizarMedicion = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fechaHora, sintomas } = req.body;
 
+    const medicion = await Medicion.findById(id);
+
+    if (!medicion) {
+      return res.status(404).json({
+        error: "Medición no encontrada",
+      });
+    }
+
+    if (fechaHora) {
+      const nuevaFecha = new Date(fechaHora);
+
+      if (isNaN(nuevaFecha.getTime())) {
+        return res.status(400).json({
+          error: "La fecha y hora no son válidas",
+        });
+      }
+
+      medicion.createdAt = nuevaFecha;
+      medicion.timestamp = nuevaFecha;
+    }
+
+    if (sintomas && typeof sintomas === "object") {
+      medicion.sintomas = {
+        fiebre:
+          sintomas.fiebre !== undefined
+            ? Boolean(sintomas.fiebre)
+            : medicion.sintomas?.fiebre || false,
+
+        tos:
+          sintomas.tos !== undefined
+            ? Boolean(sintomas.tos)
+            : medicion.sintomas?.tos || false,
+
+        retraccion_intercostal:
+          sintomas.retraccion_intercostal !== undefined
+            ? Boolean(sintomas.retraccion_intercostal)
+            : medicion.sintomas?.retraccion_intercostal || false,
+
+        dificultad_respiratoria:
+          sintomas.dificultad_respiratoria !== undefined
+            ? Boolean(sintomas.dificultad_respiratoria)
+            : medicion.sintomas?.dificultad_respiratoria || false,
+
+        saturacion_baja:
+          sintomas.saturacion_baja !== undefined
+            ? Boolean(sintomas.saturacion_baja)
+            : medicion.sintomas?.saturacion_baja || false,
+
+        observaciones_clinicas:
+          sintomas.observaciones_clinicas !== undefined
+            ? String(
+                sintomas.observaciones_clinicas
+              ).trim()
+            : medicion.sintomas?.observaciones_clinicas || "",
+      };
+    }
+
+    await medicion.save();
+
+    res.json({
+      mensaje: "Medición actualizada correctamente",
+      medicion,
+    });
+  } catch (error) {
+    console.error(
+      "Error actualizando medición:",
+      error
+    );
+
+    res.status(500).json({
+      error:
+        "Error actualizando medición: " +
+        error.message,
+    });
+  }
+};
 // Eliminar medición
 const eliminarMedicion = async (req, res) => {
   console.log("ID recibido:", req.params.id);
@@ -499,5 +580,6 @@ module.exports = {
   obtenerResumen,
   clasificarYGuardar,
   iotAudio,
+  actualizarMedicion,
   eliminarMedicion,
 };
