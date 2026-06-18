@@ -78,9 +78,13 @@ const iotAudio = async (req, res) => {
     }
 
     const paciente = await Paciente.findById(pacienteActivoId);
+
     if (!paciente) {
       pacienteActivoId = null;
-      return res.status(404).json({ error: "Paciente activo no encontrado" });
+
+      return res.status(404).json({
+        error: "Paciente activo no encontrado",
+      });
     }
 
     if (!req.file) {
@@ -89,42 +93,77 @@ const iotAudio = async (req, res) => {
       });
     }
 
-    const fileName = `${Date.now()}_${req.file.originalname || "audio.wav"}`;
-    const filePath = path.join(uploadsDir, fileName);
+    const fileName = `${Date.now()}_${
+      req.file.originalname || "audio.wav"
+    }`;
 
-    fs.writeFileSync(filePath, req.file.buffer);
+    const filePath = path.join(
+      uploadsDir,
+      fileName
+    );
 
-    const frecuenciaRespiratoria = req.body.frecuencia_respiratoria
-      ? Number(req.body.frecuencia_respiratoria)
-      : 0;
+    fs.writeFileSync(
+      filePath,
+      req.file.buffer
+    );
 
-    const ruido = req.body.ruido ? Number(req.body.ruido) : 0;
-
+    // El MPU6050 solo representa movimiento del dispositivo.
     const acelerometro = {
-      x: req.body.ax ? Number(req.body.ax) : 0,
-      y: req.body.ay ? Number(req.body.ay) : 0,
-      z: req.body.az ? Number(req.body.az) : 0,
+      x: req.body.ax
+        ? Number(req.body.ax)
+        : 0,
+
+      y: req.body.ay
+        ? Number(req.body.ay)
+        : 0,
+
+      z: req.body.az
+        ? Number(req.body.az)
+        : 0,
     };
 
+    // El ruido sí puede venir desde el dispositivo.
+    const ruidoDispositivo = req.body.ruido
+      ? Number(req.body.ruido)
+      : undefined;
+
     const form = new FormData();
-    form.append("file", req.file.buffer, fileName);
+
+    form.append(
+      "file",
+      req.file.buffer,
+      fileName
+    );
 
     console.log("Enviando audio al ML...");
 
-    const response = await axios.post(`${ML_API_URL}/predict-audio`, form, {
-      headers: {
-        ...form.getHeaders(),
-        "ngrok-skip-browser-warning": "true",
-      },
-      maxBodyLength: Infinity,
-      timeout: 120000,
-    });
+    const response = await axios.post(
+      `${ML_API_URL}/predict-audio`,
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          "ngrok-skip-browser-warning": "true",
+        },
 
-    console.log("Respuesta del ML recibida:", response.data);
+        maxBodyLength: Infinity,
+        timeout: 120000,
+      }
+    );
+
+    console.log(
+      "Respuesta del ML recibida:",
+      response.data
+    );
 
     const {
       prediccion,
       confianza,
+
+      frecuencia_respiratoria:
+        frecuenciaRespiratoriaML,
+
+      calidad_rpm,
       audio_url,
       ruta_audio,
       clase_guardada,
@@ -132,43 +171,114 @@ const iotAudio = async (req, res) => {
       waveform_url,
       spectrogram_url,
       features_resumen,
+      score_riesgo,
+      nivel_riesgo,
+      repetir_captura,
+      estado_modelo,
+      raw_dbfs,
     } = response.data;
+
+    console.log(
+      "RPM recibidas desde ML:",
+      frecuenciaRespiratoriaML
+    );
+
+    console.log(
+      "Calidad RPM:",
+      calidad_rpm
+    );
 
     const nuevaMedicion = new Medicion({
       paciente: pacienteActivoId,
-      frecuencia_respiratoria: frecuenciaRespiratoria,
-      ruido,
+
+      frecuencia_respiratoria:
+        frecuenciaRespiratoriaML !== undefined &&
+        frecuenciaRespiratoriaML !== null
+          ? Number(frecuenciaRespiratoriaML)
+          : 0,
+
+      ruido:
+        ruidoDispositivo !== undefined
+          ? ruidoDispositivo
+          : raw_dbfs !== undefined
+          ? Number(raw_dbfs)
+          : undefined,
+
       resultado: {
         tipo: prediccion,
-        confianza,
+        confianza: Number(confianza || 0),
       },
+
       acelerometro,
+
       audio_filename: fileName,
       audio_url: audio_url || null,
       ruta_audio: ruta_audio || null,
-      clase_guardada: clase_guardada || prediccion || null,
-      archivo_guardado_ml: archivo_guardado || null,
-      waveform_url: waveform_url || null,
-      spectrogram_url: spectrogram_url || null,
-      features: features_resumen || {},
+
+      clase_guardada:
+        clase_guardada || prediccion || null,
+
+      archivo_guardado_ml:
+        archivo_guardado || null,
+
+      waveform_url:
+        waveform_url || null,
+
+      spectrogram_url:
+        spectrogram_url || null,
+
+      features:
+        features_resumen || {},
+
+      score_riesgo:
+        Number(score_riesgo || 0),
+
+      nivel_riesgo:
+        nivel_riesgo || "bajo",
+
+      repetir_captura:
+        Boolean(repetir_captura),
+
+      estado_modelo:
+        estado_modelo || "confiable",
     });
 
     await nuevaMedicion.save();
 
     res.status(201).json({
-      mensaje: "Audio IoT clasificado y guardado correctamente",
+      mensaje:
+        "Audio IoT clasificado y guardado correctamente",
+
       pacienteActivoId,
       medicion: nuevaMedicion,
     });
   } catch (error) {
-    console.error("Error en iotAudio:");
-    console.error("Mensaje:", error.message);
-    console.error("Respuesta ML:", error.response?.data);
-    console.error("Status ML:", error.response?.status);
+    console.error(
+      "Error en iotAudio:"
+    );
+
+    console.error(
+      "Mensaje:",
+      error.message
+    );
+
+    console.error(
+      "Respuesta ML:",
+      error.response?.data
+    );
+
+    console.error(
+      "Status ML:",
+      error.response?.status
+    );
 
     res.status(500).json({
-      error: "Error al procesar audio IoT",
-      detalle: error.response?.data || error.message,
+      error:
+        "Error al procesar audio IoT",
+
+      detalle:
+        error.response?.data ||
+        error.message,
     });
   }
 };
