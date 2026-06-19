@@ -465,20 +465,24 @@ const iotAudio = async (req, res) => {
     });
   }
 };
+
 // Actualizar datos manuales de una medición
 const actualizarMedicion = async (req, res) => {
   try {
     const { id } = req.params;
     const { fechaHora, sintomas } = req.body;
 
-    const medicion = await Medicion.findById(id);
+    const medicionExistente = await Medicion.findById(id);
 
-    if (!medicion) {
+    if (!medicionExistente) {
       return res.status(404).json({
         error: "Medición no encontrada",
       });
     }
 
+    const actualizacion = {};
+
+    // Fecha y hora editable
     if (fechaHora) {
       const nuevaFecha = new Date(fechaHora);
 
@@ -488,51 +492,88 @@ const actualizarMedicion = async (req, res) => {
         });
       }
 
-      medicion.createdAt = nuevaFecha;
-      medicion.timestamp = nuevaFecha;
+      actualizacion.createdAt = nuevaFecha;
     }
 
+    // Síntomas y observaciones editables
     if (sintomas && typeof sintomas === "object") {
-      medicion.sintomas = {
+      actualizacion.sintomas = {
         fiebre:
           sintomas.fiebre !== undefined
             ? Boolean(sintomas.fiebre)
-            : medicion.sintomas?.fiebre || false,
+            : Boolean(
+                medicionExistente.sintomas?.fiebre
+              ),
 
         tos:
           sintomas.tos !== undefined
             ? Boolean(sintomas.tos)
-            : medicion.sintomas?.tos || false,
+            : Boolean(
+                medicionExistente.sintomas?.tos
+              ),
 
         retraccion_intercostal:
           sintomas.retraccion_intercostal !== undefined
-            ? Boolean(sintomas.retraccion_intercostal)
-            : medicion.sintomas?.retraccion_intercostal || false,
+            ? Boolean(
+                sintomas.retraccion_intercostal
+              )
+            : Boolean(
+                medicionExistente.sintomas
+                  ?.retraccion_intercostal
+              ),
 
         dificultad_respiratoria:
           sintomas.dificultad_respiratoria !== undefined
-            ? Boolean(sintomas.dificultad_respiratoria)
-            : medicion.sintomas?.dificultad_respiratoria || false,
+            ? Boolean(
+                sintomas.dificultad_respiratoria
+              )
+            : Boolean(
+                medicionExistente.sintomas
+                  ?.dificultad_respiratoria
+              ),
 
         saturacion_baja:
           sintomas.saturacion_baja !== undefined
-            ? Boolean(sintomas.saturacion_baja)
-            : medicion.sintomas?.saturacion_baja || false,
+            ? Boolean(
+                sintomas.saturacion_baja
+              )
+            : Boolean(
+                medicionExistente.sintomas
+                  ?.saturacion_baja
+              ),
 
         observaciones_clinicas:
           sintomas.observaciones_clinicas !== undefined
             ? String(
                 sintomas.observaciones_clinicas
               ).trim()
-            : medicion.sintomas?.observaciones_clinicas || "",
+            : medicionExistente.sintomas
+                ?.observaciones_clinicas || "",
       };
     }
 
-    await medicion.save();
+    if (Object.keys(actualizacion).length === 0) {
+      return res.status(400).json({
+        error: "No se enviaron campos editables",
+      });
+    }
+
+    const medicionActualizada =
+      await Medicion.findByIdAndUpdate(
+        id,
+        {
+          $set: actualizacion,
+        },
+        {
+          new: true,
+          runValidators: true,
+          timestamps: false,
+        }
+      );
 
     res.json({
       mensaje: "Medición actualizada correctamente",
-      medicion,
+      medicion: medicionActualizada,
     });
   } catch (error) {
     console.error(
