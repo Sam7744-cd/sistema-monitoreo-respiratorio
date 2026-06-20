@@ -8,6 +8,19 @@ const MedicionSchema = new mongoose.Schema(
       required: true,
     },
 
+    dispositivo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Dispositivo",
+      default: null,
+      index: true,
+    },
+
+    dispositivo_codigo: {
+      type: String,
+      default: "ESP32-RESP-001",
+      trim: true,
+    },
+
     frecuencia_respiratoria: Number,
     ruido: Number,
 

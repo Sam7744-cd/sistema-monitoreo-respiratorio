@@ -1,22 +1,48 @@
-// Rutas para manejar dispositivos IoT en el sistema
+const express = require("express");
 
-const express = require('express');
+const {
+  inicializarPrincipal,
+  obtenerPrincipal,
+  listarDispositivos,
+  actualizarPrincipal,
+  registrarConexion,
+} = require("../controllers/dispositivoController");
+
+const authMiddleware =
+  require("../middleware/auth");
+
 const router = express.Router();
 
-// Controlador
-const {
-  registrarDispositivo,
-  obtenerDispositivo
-} = require('../controllers/dispositivoController');
+// El ESP32 puede informar que está conectado
+// sin necesitar una sesión de usuario.
+router.post(
+  "/heartbeat",
+  registrarConexion
+);
 
-// Middleware de autenticación
-const authMiddleware = require('../middleware/auth');
-router.use(authMiddleware);
+// Consultas administrativas y médicas.
+router.post(
+  "/inicializar",
+  authMiddleware,
+  inicializarPrincipal
+);
 
-// Ruta para registrar un nuevo dispositivo
-router.post('/', registrarDispositivo);
+router.get(
+  "/principal",
+  authMiddleware,
+  obtenerPrincipal
+);
 
-// Ruta para obtener el dispositivo asociado a un paciente
-router.get('/paciente/:pacienteId', obtenerDispositivo);
+router.get(
+  "/",
+  authMiddleware,
+  listarDispositivos
+);
+
+router.put(
+  "/principal",
+  authMiddleware,
+  actualizarPrincipal
+);
 
 module.exports = router;

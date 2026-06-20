@@ -4,8 +4,56 @@ const axios = require("axios");
 const FormData = require("form-data");
 const Paciente = require("../models/Paciente");
 const Medicion = require("../models/medicion");
+const Dispositivo = require("../models/Dispositivo");
 
 const ML_API_URL = process.env.ML_API_URL || "http://127.0.0.1:5001";
+
+const DISPOSITIVO_CODIGO =
+  process.env.DISPOSITIVO_CODIGO ||
+  "ESP32-RESP-001";
+
+async function obtenerDispositivoPrincipal() {
+  return Dispositivo.findOneAndUpdate(
+    {
+      codigo: DISPOSITIVO_CODIGO,
+    },
+    {
+      $setOnInsert: {
+        codigo: DISPOSITIVO_CODIGO,
+        nombre:
+          "Prototipo respiratorio principal",
+        descripcion:
+          "Dispositivo portable IoT para captura y monitoreo de sonidos respiratorios.",
+        tipoControlador: "ESP32 Tipo-C",
+        sensores: {
+          microfono: "INMP441",
+          acelerometro: "MPU6050",
+          pantalla: "LCD 16x2 I2C",
+        },
+        configuracion: {
+          frecuenciaMuestreo: 16000,
+          muestrasFFT: 1024,
+          conectividad: "WiFi",
+          versionFirmware: "1.0.0",
+        },
+        estado: "activo",
+        ubicacion:
+          "Fundación AVSI Ecuador, sede Santa Elena",
+        activo: true,
+      },
+      $set: {
+        ultimaConexion: new Date(),
+        estado: "activo",
+        activo: true,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    }
+  );
+}
 
 let pacienteActivoId = null;
 
@@ -28,6 +76,16 @@ const setPacienteActivo = async (req, res) => {
     }
 
     pacienteActivoId = pacienteId;
+
+    const dispositivo =
+      await obtenerDispositivoPrincipal();
+
+    dispositivo.pacienteActual =
+      pacienteId;
+    dispositivo.ultimaConexion =
+      new Date();
+
+    await dispositivo.save();
 
     res.json({
       mensaje: "Paciente activo configurado correctamente",
@@ -188,8 +246,14 @@ const iotAudio = async (req, res) => {
       calidad_rpm
     );
 
+    const dispositivo =
+      await obtenerDispositivoPrincipal();
+
     const nuevaMedicion = new Medicion({
       paciente: pacienteActivoId,
+      dispositivo: dispositivo._id,
+      dispositivo_codigo:
+        dispositivo.codigo,
 
       frecuencia_respiratoria:
         frecuenciaRespiratoriaML !== undefined &&
@@ -244,6 +308,23 @@ const iotAudio = async (req, res) => {
     });
 
     await nuevaMedicion.save();
+
+    await Dispositivo.findByIdAndUpdate(
+      dispositivo._id,
+      {
+        $set: {
+          ultimaConexion: new Date(),
+          ultimaCaptura: new Date(),
+          pacienteActual:
+            pacienteActivoId,
+          estado: "activo",
+          activo: true,
+        },
+        $inc: {
+          totalCapturas: 1,
+        },
+      }
+    );
 
     res.status(201).json({
       mensaje:
