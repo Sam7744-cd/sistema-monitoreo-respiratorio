@@ -1,6 +1,6 @@
 const Paciente = require("../models/Paciente");
 const Usuario = require("../models/Usuario");
-const bcrypt = require("bcryptjs");
+
 
 //  helper: calcular edad (años) desde fechaNacimiento
 function calcEdadAnios(fechaNacimiento) {
@@ -62,38 +62,30 @@ const crearPaciente = async (req, res) => {
     const telFinal = responsable?.telefono || telefono || "";
     const correoFinal = responsable?.correo || correo || "";
 
-   
-    let familiarCreado = null;
+  let familiarExistente = null;
 
-    if (responsable?.nombre && responsable?.cedula) {
+  const coincidenciasFamiliar = [];
 
-      const familiarExistente = await Usuario.findOne({
-        cedula: responsable.cedula,
-      });
+  if (responsable?.cedula) {
+    coincidenciasFamiliar.push({
+      cedula: String(responsable.cedula).trim(),
+    });
+  }
 
-      if (familiarExistente) {
+  if (responsable?.correo) {
+    coincidenciasFamiliar.push({
+      email: String(responsable.correo)
+        .trim()
+        .toLowerCase(),
+    });
+  }
 
-        familiarCreado = familiarExistente;
-
-      } else {
-
-        const passwordTemporal = await bcrypt.hash("familia123", 10);
-
-        familiarCreado = new Usuario({
-          nombre: responsable.nombre,
-          email:
-            responsable.correo ||
-            `familiar${responsable.cedula}@gmail.com`,
-          password: passwordTemporal,
-          rol: "familiar",
-          telefono: responsable.telefono || "",
-          cedula: responsable.cedula,
-          parentesco: responsable.parentesco || "Tutor",
-        });
-
-        await familiarCreado.save();
-      }
-    }
+  if (coincidenciasFamiliar.length > 0) {
+    familiarExistente = await Usuario.findOne({
+      rol: "familiar",
+      $or: coincidenciasFamiliar,
+    });
+  }
 
     // Guardar
     const nuevo = new Paciente({
@@ -114,16 +106,36 @@ const crearPaciente = async (req, res) => {
       responsable: responsable || undefined,
 
       medico: medicoId,
-      familiares: familiarCreado ? [familiarCreado._id] : [],
+      familiares: familiarExistente
+      ? [familiarExistente._id]
+      : [],
     });
 
     await nuevo.save();
 
     await Usuario.findByIdAndUpdate(medicoId, {
-      $addToSet: { pacientes: nuevo._id },
+      $addToSet: {
+        pacientes: nuevo._id,
+      },
     });
 
-    res.status(201).json({ mensaje: "Paciente creado exitosamente", paciente: nuevo });
+    if (familiarExistente) {
+      await Usuario.findByIdAndUpdate(
+        familiarExistente._id,
+        {
+          $addToSet: {
+            pacientes: nuevo._id,
+          },
+        }
+      );
+    }
+
+    res.status(201).json({
+      mensaje: familiarExistente
+        ? "Paciente creado y familiar asociado correctamente"
+        : "Paciente creado. El familiar se asociará cuando registre su cuenta.",
+      paciente: nuevo,
+    });
   } catch (error) {
     res.status(500).json({ error: "Error creando paciente: " + error.message });
   }
