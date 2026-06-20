@@ -163,20 +163,54 @@ const registrar = async (req, res) => {
     });
   }
 };
-// Login
+
+// LOGIN
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const emailNormalizado = String(
+      req.body.email || ""
+    )
+      .trim()
+      .toLowerCase();
 
-    const usuario = await Usuario.findOne({ email });
-    if (!usuario) return res.status(400).json({ error: "Credenciales inválidas" });
+    const password = String(
+      req.body.password || ""
+    );
 
-    if (usuario.activo === false) {
-      return res.status(403).json({ error: "Usuario inactivo" });
+    if (!emailNormalizado || !password) {
+      return res.status(400).json({
+        error:
+          "El correo y la contraseña son obligatorios",
+      });
     }
 
-    const contrasenaValida = await bcrypt.compare(password, usuario.password);
-    if (!contrasenaValida) return res.status(400).json({ error: "Credenciales inválidas" });
+    const usuario = await Usuario.findOne({
+      email: emailNormalizado,
+    });
+
+    if (!usuario) {
+      return res.status(400).json({
+        error: "Credenciales inválidas",
+      });
+    }
+
+    if (usuario.activo === false) {
+      return res.status(403).json({
+        error: "Usuario inactivo",
+      });
+    }
+
+    const contrasenaValida =
+      await bcrypt.compare(
+        password,
+        usuario.password
+      );
+
+    if (!contrasenaValida) {
+      return res.status(400).json({
+        error: "Credenciales inválidas",
+      });
+    }
 
     usuario.ultimoAcceso = new Date();
     await usuario.save();
@@ -247,6 +281,15 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
+      {
+        id: usuario._id,
+        rol: usuario.rol,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
 
     res.json({
       mensaje: "Login exitoso",
@@ -257,13 +300,23 @@ const login = async (req, res) => {
         email: usuario.email,
         rol: usuario.rol,
         telefono: usuario.telefono,
+        cedula: usuario.cedula,
+        parentesco: usuario.parentesco,
       },
     });
   } catch (error) {
-    res.status(500).json({ error: "Error en el servidor: " + error.message });
+    console.error(
+      "Error iniciando sesión:",
+      error
+    );
+
+    res.status(500).json({
+      error:
+        "Error en el servidor: " +
+        error.message,
+    });
   }
 };
-
 // OBTENER PERFIL REAL
 const obtenerPerfil = async (req, res) => {
   try {
