@@ -294,6 +294,9 @@ const login = async (req, res) => {
 };
 
 // LOGIN CON GOOGLE
+// - Si el correo ya existe, conserva el rol creado previamente
+//   por el administrador: médico, administrador o familiar.
+// - Si el correo no existe, crea únicamente una cuenta familiar.
 const loginGoogle = async (req, res) => {
   try {
     const credential = String(
@@ -334,8 +337,20 @@ const loginGoogle = async (req, res) => {
       });
     }
 
-    const googleId = String(payload.sub);
-    const email = String(payload.email)
+    if (!payload.email_verified) {
+      return res.status(401).json({
+        error:
+          "Google no pudo verificar este correo electrónico",
+      });
+    }
+
+    const googleId = String(
+      payload.sub
+    ).trim();
+
+    const email = String(
+      payload.email
+    )
       .trim()
       .toLowerCase();
 
@@ -343,16 +358,24 @@ const loginGoogle = async (req, res) => {
       String(payload.name || "").trim() ||
       email.split("@")[0];
 
+    /*
+      Primero se busca por googleId y luego por correo.
+
+      Si el administrador ya creó una cuenta de médico
+      o administrador con ese Gmail, se vincula Google
+      con esa misma cuenta y se conserva su rol.
+    */
     let usuario = await Usuario.findOne({
-      $or: [
-        {
-          googleId,
-        },
-        {
-          email,
-        },
-      ],
+      googleId,
     });
+
+    if (!usuario) {
+      usuario = await Usuario.findOne({
+        email,
+      });
+    }
+
+    let cuentaNueva = false;
 
     if (usuario) {
       if (usuario.activo === false) {
@@ -367,22 +390,37 @@ const loginGoogle = async (req, res) => {
       ) {
         return res.status(409).json({
           error:
-            "El correo ya está vinculado con otra cuenta de Google",
+            "Este correo ya está vinculado con otra cuenta de Google",
         });
       }
 
+      /*
+        No se cambia usuario.rol.
+
+        Por eso:
+        - un médico creado por el administrador sigue siendo médico;
+        - un administrador sigue siendo administrador;
+        - un familiar existente sigue siendo familiar.
+      */
       usuario.googleId = googleId;
-      usuario.emailVerificado =
-        Boolean(payload.email_verified);
+      usuario.emailVerificado = true;
 
       if (!usuario.nombre) {
         usuario.nombre = nombre;
       }
 
-      usuario.ultimoAcceso = new Date();
+      usuario.ultimoAcceso =
+        new Date();
 
       await usuario.save();
     } else {
+      /*
+        Google nunca crea médicos ni administradores
+        automáticamente. Una cuenta desconocida se
+        registra solamente como familiar.
+      */
+      cuentaNueva = true;
+
       usuario = new Usuario({
         nombre,
         email,
@@ -390,8 +428,7 @@ const loginGoogle = async (req, res) => {
         rol: "familiar",
         authProvider: "google",
         googleId,
-        emailVerificado:
-          Boolean(payload.email_verified),
+        emailVerificado: true,
         perfilCompleto: false,
         ultimoAcceso: new Date(),
       });
@@ -399,19 +436,53 @@ const loginGoogle = async (req, res) => {
       await usuario.save();
     }
 
-    if (usuario.perfilCompleto) {
+    /*
+      Solo los familiares nuevos o incompletos
+      deben llenar cédula, teléfono y parentesco.
+    */
+    const requiereCompletarPerfil =
+      usuario.rol === "familiar" &&
+      !usuario.perfilCompleto;
+
+    if (
+      usuario.rol === "familiar" &&
+      usuario.perfilCompleto
+    ) {
       await asociarPacientes(usuario);
     }
 
-    const token = generarToken(usuario);
+    const token =
+      generarToken(usuario);
 
-    res.json({
-      mensaje: usuario.perfilCompleto
-        ? "Inicio de sesión con Google exitoso"
-        : "Completa tus datos para finalizar el registro",
+    let mensaje =
+      "Inicio de sesión con Google exitoso";
+
+    if (requiereCompletarPerfil) {
+      mensaje =
+        "Completa tus datos para finalizar el registro familiar";
+    } else if (
+      cuentaNueva &&
+      usuario.rol === "familiar"
+    ) {
+      mensaje =
+        "Cuenta familiar creada con Google";
+    } else if (
+      usuario.rol === "medico"
+    ) {
+      mensaje =
+        "Inicio de sesión médico con Google exitoso";
+    } else if (
+      usuario.rol === "admin"
+    ) {
+      mensaje =
+        "Inicio de sesión administrativo con Google exitoso";
+    }
+
+    return res.json({
+      mensaje,
       token,
-      requiereCompletarPerfil:
-        !usuario.perfilCompleto,
+      cuentaNueva,
+      requiereCompletarPerfil,
       usuario: datosUsuario(usuario),
     });
   } catch (error) {
@@ -420,7 +491,7 @@ const loginGoogle = async (req, res) => {
       error
     );
 
-    res.status(401).json({
+    return res.status(401).json({
       error:
         "No se pudo validar el inicio de sesión con Google",
     });
