@@ -160,6 +160,7 @@ exports.actualizarUsuarioAdmin = async (req, res) => {
     const { id } = req.params;
     const {
       nombre,
+      email,
       telefono,
       cedula,
       rol,
@@ -173,9 +174,66 @@ exports.actualizarUsuarioAdmin = async (req, res) => {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
-    if (nombre !== undefined) usuario.nombre = nombre;
-    if (telefono !== undefined) usuario.telefono = telefono;
-    if (cedula !== undefined) usuario.cedula = cedula;
+    if (nombre !== undefined) {
+      usuario.nombre = String(nombre).trim();
+    }
+
+    if (email !== undefined) {
+      const emailNormalizado = String(email)
+        .trim()
+        .toLowerCase();
+
+      if (!emailNormalizado) {
+        return res.status(400).json({
+          error:
+            "El correo electrónico es obligatorio",
+        });
+      }
+
+      const correoEnUso =
+        await Usuario.findOne({
+          _id: {
+            $ne: usuario._id,
+          },
+          email: emailNormalizado,
+        });
+
+      if (correoEnUso) {
+        return res.status(400).json({
+          error:
+            "Ya existe otro usuario con ese correo",
+        });
+      }
+
+      const correoCambio =
+        emailNormalizado !==
+        String(usuario.email || "")
+          .trim()
+          .toLowerCase();
+
+      if (correoCambio) {
+        usuario.email = emailNormalizado;
+
+        /*
+          El googleId pertenece al correo anterior.
+          Se elimina para evitar una vinculación incorrecta.
+        */
+        usuario.googleId = null;
+        usuario.emailVerificado = false;
+
+        if (usuario.password) {
+          usuario.authProvider = "local";
+        }
+      }
+    }
+
+    if (telefono !== undefined) {
+      usuario.telefono = telefono;
+    }
+
+    if (cedula !== undefined) {
+      usuario.cedula = cedula;
+    }
 
     if (rol !== undefined) {
       if (!["medico", "familiar", "admin"].includes(rol)) {
