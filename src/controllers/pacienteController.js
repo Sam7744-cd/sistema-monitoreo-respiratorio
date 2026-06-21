@@ -1,5 +1,6 @@
 const Paciente = require("../models/Paciente");
 const Usuario = require("../models/Usuario");
+const mongoose = require("mongoose");
 
 
 //  helper: calcular edad (años) desde fechaNacimiento
@@ -245,7 +246,25 @@ const agregarFamiliar = async (req, res) => {
     const { familiarId } = req.body;
 
     if (!familiarId) {
-      return res.status(400).json({ error: "familiarId es obligatorio" });
+      return res.status(400).json({
+        error: "familiarId es obligatorio",
+      });
+    }
+
+    /*
+      Los responsables pendientes usan identificadores
+      visuales como "pendiente-099...". No son ObjectId
+      de MongoDB y todavía no tienen una cuenta real.
+    */
+    if (
+      String(familiarId).startsWith("pendiente-") ||
+      !mongoose.Types.ObjectId.isValid(familiarId)
+    ) {
+      return res.status(409).json({
+        error:
+          "Este responsable todavía no tiene una cuenta familiar registrada. Debe crear su cuenta con la misma cédula o correo para asociarse automáticamente.",
+        pendiente: true,
+      });
     }
 
     const paciente = await Paciente.findById(pacienteId);
@@ -281,6 +300,16 @@ const agregarFamiliar = async (req, res) => {
 const quitarFamiliar = async (req, res) => {
   try {
     const { pacienteId, familiarId } = req.params;
+
+    if (
+      String(familiarId).startsWith("pendiente-") ||
+      !mongoose.Types.ObjectId.isValid(familiarId)
+    ) {
+      return res.status(400).json({
+        error:
+          "No se puede desvincular un responsable pendiente porque todavía no existe como usuario.",
+      });
+    }
 
     const paciente = await Paciente.findById(pacienteId);
     if (!paciente) {

@@ -21,6 +21,7 @@ const listarFamiliares = async (req, res) => {
     );
 
     const pendientes = [];
+    const clavesPendientes = new Set();
 
     for (const p of pacientes) {
       const r = p.responsable;
@@ -39,16 +40,30 @@ const listarFamiliares = async (req, res) => {
       });
 
       if (!yaExiste) {
-        pendientes.push({
-          _id: `pendiente-${r.cedula || r.correo || Math.random()}`,
-          nombre: r.nombre,
-          email: r.correo || "",
-          cedula: r.cedula || "",
-          parentesco: r.parentesco || "Responsable",
-          telefono: r.telefono || "",
-          pendiente: true,
-          pacientes: [],
-        });
+        const clave =
+          String(
+            r.cedula ||
+              r.correo ||
+              r.nombre
+          )
+            .trim()
+            .toLowerCase();
+
+        if (!clavesPendientes.has(clave)) {
+          clavesPendientes.add(clave);
+
+          pendientes.push({
+            _id: `pendiente-${clave}`,
+            nombre: r.nombre,
+            email: r.correo || "",
+            cedula: r.cedula || "",
+            parentesco:
+              r.parentesco || "Responsable",
+            telefono: r.telefono || "",
+            pendiente: true,
+            pacientes: [],
+          });
+        }
       }
     }
 

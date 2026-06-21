@@ -1,10 +1,23 @@
 const Usuario = require("../models/Usuario");
 const Paciente = require("../models/Paciente");
 const bcrypt = require("bcryptjs");
+const mongoose = require("mongoose");
 
 exports.asociarPaciente = async (req, res) => {
   try {
     const { pacienteId, familiarId } = req.body;
+
+    if (
+      !familiarId ||
+      String(familiarId).startsWith("pendiente-") ||
+      !mongoose.Types.ObjectId.isValid(familiarId)
+    ) {
+      return res.status(409).json({
+        error:
+          "Este responsable todavía no tiene una cuenta familiar registrada. Debe registrarse con la misma cédula o correo.",
+        pendiente: true,
+      });
+    }
 
     const paciente = await Paciente.findById(pacienteId);
     if (!paciente) {
