@@ -72,7 +72,7 @@ exports.listarUsuariosAdmin = async (req, res) => {
   try {
     const usuarios = await Usuario.find({})
       .select(
-        "nombre email rol telefono cedula parentesco direccion especialidad createdAt ultimoAcceso activo"
+        "nombre email rol telefono cedula parentesco direccion especialidad createdAt ultimoAcceso activo authProvider googleId emailVerificado"
       )
       .sort({ createdAt: -1 });
 
@@ -87,7 +87,7 @@ exports.obtenerUsuarioAdmin = async (req, res) => {
     const { id } = req.params;
 
     const usuario = await Usuario.findById(id).select(
-      "nombre email rol telefono cedula parentesco direccion especialidad ultimoAcceso activo createdAt"
+      "nombre email rol telefono cedula parentesco direccion especialidad ultimoAcceso activo createdAt authProvider googleId emailVerificado"
     );
 
     if (!usuario) {
@@ -241,5 +241,107 @@ exports.eliminarUsuarioAdmin = async (req, res) => {
     res.json({ mensaje: "Usuario eliminado correctamente" });
   } catch (error) {
     res.status(500).json({ error: "Error eliminando usuario: " + error.message });
+  }
+};
+
+exports.restablecerPasswordAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const usuario = await Usuario.findById(id);
+
+    if (!usuario) {
+      return res.status(404).json({
+        error: "Usuario no encontrado",
+      });
+    }
+
+    if (usuario.activo === false) {
+      return res.status(400).json({
+        error:
+          "No se puede restablecer la contraseña de un usuario inactivo",
+      });
+    }
+
+    /*
+      Se genera una contraseña temporal segura.
+      Solo se devuelve una vez al administrador.
+      MongoDB guarda únicamente el hash.
+    */
+    const mayusculas = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const minusculas = "abcdefghijkmnopqrstuvwxyz";
+    const numeros = "23456789";
+    const simbolos = "@#$%";
+
+    const elegir = (texto) =>
+      texto[
+        Math.floor(Math.random() * texto.length)
+      ];
+
+    const baseTemporal = [
+      elegir(mayusculas),
+      elegir(minusculas),
+      elegir(numeros),
+      elegir(simbolos),
+    ];
+
+    const todos =
+      mayusculas +
+      minusculas +
+      numeros +
+      simbolos;
+
+    while (baseTemporal.length < 10) {
+      baseTemporal.push(elegir(todos));
+    }
+
+    const passwordTemporal = baseTemporal
+      .sort(() => Math.random() - 0.5)
+      .join("");
+
+    usuario.password = await bcrypt.hash(
+      passwordTemporal,
+      10
+    );
+
+    /*
+      Si era una cuenta creada solo con Google,
+      ahora también podrá entrar con contraseña.
+      No se elimina googleId, por lo que conserva
+      ambos métodos de acceso.
+    */
+    if (usuario.googleId) {
+      usuario.authProvider = "google";
+    } else {
+      usuario.authProvider = "local";
+    }
+
+    await usuario.save();
+
+    return res.json({
+      mensaje:
+        "Contraseña temporal generada correctamente",
+      passwordTemporal,
+      usuario: {
+        id: usuario._id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        metodoAcceso:
+          usuario.googleId
+            ? "Google + contraseña"
+            : "Contraseña",
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Error restableciendo contraseña desde admin:",
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        "No se pudo restablecer la contraseña",
+    });
   }
 };

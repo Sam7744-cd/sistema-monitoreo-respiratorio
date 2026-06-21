@@ -62,6 +62,14 @@ router.put("/admin/usuarios/:id", verificarRol("admin"), usuarioController.actua
 router.delete("/admin/usuarios/:id", verificarRol("admin"), usuarioController.eliminarUsuarioAdmin);
 
 
+// ADMIN - GENERAR CONTRASEÑA TEMPORAL
+router.put(
+  "/admin/usuarios/:id/restablecer-password",
+  verificarRol("admin"),
+  usuarioController.restablecerPasswordAdmin
+);
+
+
 // CAMBIAR CONTRASEÑA
 router.put("/cambiar-password", async (req, res) => {
   try {
