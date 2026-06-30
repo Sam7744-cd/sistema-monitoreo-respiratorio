@@ -486,13 +486,16 @@ const actualizarMedicion = async (req, res) => {
     if (fechaHora) {
       const nuevaFecha = new Date(fechaHora);
 
-      if (isNaN(nuevaFecha.getTime())) {
+      if (Number.isNaN(nuevaFecha.getTime())) {
         return res.status(400).json({
           error: "La fecha y hora no son válidas",
         });
       }
 
+      // Se actualizan ambos campos porque algunas vistas usan createdAt
+      // y otras pueden usar timestamp.
       actualizacion.createdAt = nuevaFecha;
+      actualizacion.timestamp = nuevaFecha;
     }
 
     // Síntomas y observaciones editables
@@ -558,18 +561,19 @@ const actualizarMedicion = async (req, res) => {
       });
     }
 
+    /*
+      Se usa la colección nativa de MongoDB porque Mongoose puede
+      impedir o ignorar cambios en createdAt cuando timestamps está activo.
+    */
+    await Medicion.collection.updateOne(
+      { _id: medicionExistente._id },
+      {
+        $set: actualizacion,
+      }
+    );
+
     const medicionActualizada =
-      await Medicion.findByIdAndUpdate(
-        id,
-        {
-          $set: actualizacion,
-        },
-        {
-          new: true,
-          runValidators: true,
-          timestamps: false,
-        }
-      );
+      await Medicion.findById(id);
 
     res.json({
       mensaje: "Medición actualizada correctamente",
